@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Marco de foto -->
+    <path
+        android:fillColor="#4FD1C5"
+        android:pathData="M28,34 h52 a6,6 0 0 1 6,6 v28 a6,6 0 0 1 -6,6 h-52 a6,6 0 0 1 -6,-6 v-28 a6,6 0 0 1 6,-6 z" />
+    <!-- Interior oscuro -->
+    <path
+        android:fillColor="#0F0F11"
+        android:pathData="M32,40 h44 a2,2 0 0 1 2,2 v22 a2,2 0 0 1 -2,2 h-44 a2,2 0 0 1 -2,-2 v-22 a2,2 0 0 1 2,-2 z" />
+    <!-- Sol / lente -->
+    <path
+        android:fillColor="#E8A33D"
+        android:pathData="M46,48 m-6,0 a6,6 0 1 0 12,0 a6,6 0 1 0 -12,0" />
+    <!-- Montaña -->
+    <path
+        android:fillColor="#4FD1C5"
+        android:pathData="M30,62 l14,-14 l10,10 l8,-8 l16,16 z" />
+</vector>
