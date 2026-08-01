@@ -89,7 +89,11 @@ fun GestorFotosNavHost(viewModel: GalleryViewModel, activity: ComponentActivity)
                     )
                 }
                 composable(Dest.Albumes.route) {
-                    AlbumsScreen(vm = viewModel, onOpenAlbum = { id -> navController.navigate("album/$id") })
+                    AlbumsScreen(
+                        vm = viewModel,
+                        onOpenAlbum = { id -> navController.navigate("album/$id") },
+                        onOpenFolder = { bucketId -> navController.navigate("carpeta/$bucketId") }
+                    )
                 }
                 composable(
                     "album/{albumId}",
@@ -99,6 +103,18 @@ fun GestorFotosNavHost(viewModel: GalleryViewModel, activity: ComponentActivity)
                     AlbumDetailScreen(
                         vm = viewModel,
                         albumId = albumId,
+                        onBack = { navController.popBackStack() },
+                        onOpenDetail = { id -> navController.navigate("detalle/$id") }
+                    )
+                }
+                composable(
+                    "carpeta/{bucketId}",
+                    arguments = listOf(navArgument("bucketId") { type = NavType.StringType })
+                ) { backStackEntry ->
+                    val bucketId = backStackEntry.arguments?.getString("bucketId") ?: return@composable
+                    SystemFolderScreen(
+                        vm = viewModel,
+                        bucketId = bucketId,
                         onBack = { navController.popBackStack() },
                         onOpenDetail = { id -> navController.navigate("detalle/$id") }
                     )

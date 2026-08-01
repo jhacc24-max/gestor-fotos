@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.gestorfotos.data.Album
 import com.example.gestorfotos.repository.PhotoRepository
+import com.example.gestorfotos.repository.SystemFolder
 import com.example.gestorfotos.repository.UiPhoto
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -34,6 +35,24 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
     val favorites: StateFlow<List<UiPhoto>> =
         photos.map { list -> list.filter { it.isFavorite && !it.isTrashed } }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /** Carpetas reales del teléfono (Cámara, WhatsApp Images, etc.), de solo lectura. */
+    val systemFolders: StateFlow<List<SystemFolder>> = photos.map { list ->
+        list.filter { !it.isTrashed }
+            .groupBy { it.bucketId to it.bucketName }
+            .map { (key, items) ->
+                SystemFolder(
+                    bucketId = key.first,
+                    name = key.second,
+                    photoCount = items.size,
+                    coverUri = items.maxByOrNull { it.dateAddedMillis }!!.displayUri
+                )
+            }
+            .sortedByDescending { it.photoCount }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun photosInFolder(bucketId: String): List<UiPhoto> =
+        photos.value.filter { it.bucketId == bucketId && !it.isTrashed }
 
     private val _selectMode = MutableStateFlow(false)
     val selectMode: StateFlow<Boolean> = _selectMode

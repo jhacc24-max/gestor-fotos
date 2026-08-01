@@ -5,6 +5,7 @@ import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,6 +15,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,9 +33,10 @@ import com.example.gestorfotos.ui.theme.SurfaceRaised
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AlbumsScreen(vm: GalleryViewModel, onOpenAlbum: (Long) -> Unit) {
+fun AlbumsScreen(vm: GalleryViewModel, onOpenAlbum: (Long) -> Unit, onOpenFolder: (String) -> Unit) {
     val albums by vm.albums.collectAsState()
     val photos by vm.photos.collectAsState()
+    val folders by vm.systemFolders.collectAsState()
     var showNewAlbumDialog by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -46,7 +49,16 @@ fun AlbumsScreen(vm: GalleryViewModel, onOpenAlbum: (Long) -> Unit) {
             verticalArrangement = Arrangement.spacedBy(10.dp),
             modifier = Modifier.padding(padding)
         ) {
-            items(albums, key = { it.id }) { album ->
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                Text(
+                    "Mis álbumes",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(bottom = 2.dp)
+                )
+            }
+
+            items(albums, key = { "album_${it.id}" }) { album ->
                 val count = photos.count { it.albumId == album.id }
                 Card(
                     onClick = { onOpenAlbum(album.id) },
@@ -75,6 +87,37 @@ fun AlbumsScreen(vm: GalleryViewModel, onOpenAlbum: (Long) -> Unit) {
                         SkeuoPlate(Icons.Filled.Add, null, SkeuoStyle.CHROME, 36.dp)
                         Spacer(Modifier.height(6.dp))
                         Text("Nuevo álbum", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
+
+            if (folders.isNotEmpty()) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        "Carpetas del teléfono",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        "Las carpetas reales de tu galería (Cámara, WhatsApp, etc.). Solo lectura.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(6.dp))
+                }
+                items(folders, key = { "folder_${it.bucketId}" }) { folder ->
+                    Card(
+                        onClick = { onOpenFolder(folder.bucketId) },
+                        colors = CardDefaults.cardColors(containerColor = SurfaceRaised.copy(alpha = 0.85f)),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Column(Modifier.padding(14.dp)) {
+                            SkeuoPlate(Icons.Outlined.PhoneAndroid, null, SkeuoStyle.CHROME, 40.dp)
+                            Spacer(Modifier.height(14.dp))
+                            Text(folder.name, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                            Text("${folder.photoCount} fotos", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
                 }
             }
@@ -190,5 +233,68 @@ fun AlbumDetailScreen(vm: GalleryViewModel, albumId: Long, onBack: () -> Unit, o
             },
             dismissButton = { TextButton(onClick = { deleteConfirm = false }) { Text("Cancelar") } }
         )
+    }
+}
+
+/**
+ * Vista de una carpeta REAL del teléfono (no un álbum propio de la app): mismas
+ * fotos que verías en el explorador de archivos del sistema en esa carpeta.
+ * Es de solo lectura respecto al nombre/existencia de la carpeta (no se puede
+ * renombrar ni "eliminar" la carpeta desde aquí), pero sí se puede seleccionar,
+ * marcar como favorita, mover a un álbum propio o mandar a la papelera, igual
+ * que en cualquier otra vista de fotos.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SystemFolderScreen(vm: GalleryViewModel, bucketId: String, onBack: () -> Unit, onOpenDetail: (Long) -> Unit) {
+    val folders by vm.systemFolders.collectAsState()
+    val photos by vm.photos.collectAsState()
+    val albums by vm.albums.collectAsState()
+    val folder = folders.find { it.bucketId == bucketId }
+    val folderPhotos = photos.filter { it.bucketId == bucketId && !it.isTrashed }
+    val selectMode by vm.selectMode.collectAsState()
+    val selected by vm.selected.collectAsState()
+
+    var pendingTrashIds by remember { mutableStateOf<List<Long>>(emptyList()) }
+    val trashLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) vm.confirmTrash(pendingTrashIds)
+    }
+    fun requestTrash(ids: List<Long>) {
+        pendingTrashIds = ids
+        val uris = photos.filter { it.id in ids }.map { it.uri }
+        val sender = vm.buildTrashIntentSender(uris)
+        if (sender != null) trashLauncher.launch(IntentSenderRequest.Builder(sender).build())
+        else vm.confirmTrash(ids)
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(folder?.name ?: "Carpeta", fontWeight = FontWeight.Bold) },
+                navigationIcon = { SkeuoIconButton(Icons.Filled.ArrowBack, "Volver", SkeuoStyle.CHROME, 34.dp, onBack) }
+            )
+        },
+        bottomBar = {
+            SelectionBar(
+                count = selected.size,
+                albumNames = albums.map { it.id to it.name },
+                onMoveTo = { id, name -> vm.moveSelectedTo(id, name) },
+                onNewAlbum = { vm.createAlbum("Nuevo álbum", assignSelected = true) },
+                onFavorite = { vm.setFavoriteSelected(true) },
+                onTrash = { requestTrash(selected.toList()) },
+                onCancel = { vm.exitSelectMode() }
+            )
+        }
+    ) { padding ->
+        Box(Modifier.padding(padding).padding(horizontal = 12.dp)) {
+            PhotoGrid(
+                photos = folderPhotos,
+                selectMode = selectMode,
+                selected = selected,
+                emptyMessage = "No hay fotos en esta carpeta.",
+                onTap = { if (selectMode) vm.toggleSelect(it.id) else onOpenDetail(it.id) },
+                onLongPress = { vm.enterSelectMode(); vm.toggleSelect(it.id) }
+            )
+        }
     }
 }

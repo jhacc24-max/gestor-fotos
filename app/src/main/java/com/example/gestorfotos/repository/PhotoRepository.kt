@@ -18,7 +18,17 @@ data class MediaImage(
     val id: Long,
     val uri: Uri,
     val displayName: String,
-    val dateAddedMillis: Long
+    val dateAddedMillis: Long,
+    val bucketId: String,
+    val bucketName: String
+)
+
+/** Carpeta real del teléfono (Cámara, WhatsApp Images, Descargas, etc.), de solo lectura. */
+data class SystemFolder(
+    val bucketId: String,
+    val name: String,
+    val photoCount: Int,
+    val coverUri: Uri
 )
 
 /** Modelo unificado que usa la UI: fusiona la foto real (MediaStore) con sus metadatos (Room). */
@@ -27,6 +37,8 @@ data class UiPhoto(
     val uri: Uri,
     val displayName: String,
     val dateAddedMillis: Long,
+    val bucketId: String,
+    val bucketName: String,
     val albumId: Long?,
     val isFavorite: Boolean,
     val isTrashed: Boolean,
@@ -60,6 +72,8 @@ class PhotoRepository(private val context: Context) {
                 uri = m.uri,
                 displayName = m.displayName,
                 dateAddedMillis = m.dateAddedMillis,
+                bucketId = m.bucketId,
+                bucketName = m.bucketName,
                 albumId = meta?.albumId,
                 isFavorite = meta?.isFavorite ?: false,
                 isTrashed = meta?.isTrashed ?: false,
@@ -87,7 +101,9 @@ class PhotoRepository(private val context: Context) {
         val projection = arrayOf(
             MediaStore.Images.Media._ID,
             MediaStore.Images.Media.DISPLAY_NAME,
-            MediaStore.Images.Media.DATE_ADDED
+            MediaStore.Images.Media.DATE_ADDED,
+            MediaStore.Images.Media.BUCKET_ID,
+            MediaStore.Images.Media.BUCKET_DISPLAY_NAME
         )
         _mediaImages.value = emptyList()
         val pending = mutableListOf<MediaImage>()
@@ -101,6 +117,8 @@ class PhotoRepository(private val context: Context) {
             val idCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
             val nameCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
             val dateCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)
+            val bucketIdCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.BUCKET_ID)
+            val bucketNameCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.BUCKET_DISPLAY_NAME)
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idCol)
                 val uri = ContentUris.withAppendedId(collection, id)
@@ -108,7 +126,9 @@ class PhotoRepository(private val context: Context) {
                     id = id,
                     uri = uri,
                     displayName = cursor.getString(nameCol) ?: "",
-                    dateAddedMillis = cursor.getLong(dateCol) * 1000L
+                    dateAddedMillis = cursor.getLong(dateCol) * 1000L,
+                    bucketId = cursor.getString(bucketIdCol) ?: "sin_carpeta",
+                    bucketName = cursor.getString(bucketNameCol) ?: "Sin carpeta"
                 )
                 allIds += id
                 if (pending.size >= batchSize) {

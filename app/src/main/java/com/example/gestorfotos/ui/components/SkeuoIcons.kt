@@ -31,12 +31,16 @@ enum class SkeuoStyle { CHROME, BRASS, LEATHER, RUBY, EMERALD }
 
 private data class SkeuoPalette(val top: Color, val bottom: Color, val rim: Color, val glyph: Color)
 
+// Paleta tipo "blob" glossy (mancha de color sólido + glifo blanco grueso + brillo
+// especular fuerte), inspirada en el estilo de íconos moderno tipo Skype: un solo
+// tono saturado por acción, con degradado sutil (no metal-a-negro como antes) para
+// dar volumen, y el glifo siempre en blanco para máximo contraste.
 private fun paletteFor(style: SkeuoStyle): SkeuoPalette = when (style) {
-    SkeuoStyle.CHROME -> SkeuoPalette(Color(0xFF54545A), Color(0xFF232326), Color(0xFF6E6E74), Color(0xFFF1F1EF))
-    SkeuoStyle.BRASS -> SkeuoPalette(Color(0xFFF3C463), Color(0xFF9C6A1E), Color(0xFFFFE3A3), Color(0xFF3A2405))
-    SkeuoStyle.LEATHER -> SkeuoPalette(Color(0xFF8A5A3B), Color(0xFF4A2E1C), Color(0xFFAD7A54), Color(0xFFF3E7D8))
-    SkeuoStyle.RUBY -> SkeuoPalette(Color(0xFFE0697D), Color(0xFF8C2739), Color(0xFFF29AA8), Color(0xFFFFF3F3))
-    SkeuoStyle.EMERALD -> SkeuoPalette(Color(0xFF63D2B8), Color(0xFF17836A), Color(0xFF9CE9D6), Color(0xFF06251D))
+    SkeuoStyle.CHROME -> SkeuoPalette(Color(0xFF57707D), Color(0xFF32424B), Color(0xFF7C97A3), Color.White)
+    SkeuoStyle.BRASS -> SkeuoPalette(Color(0xFFF5A623), Color(0xFFD0821A), Color(0xFFFFCB6B), Color.White)
+    SkeuoStyle.LEATHER -> SkeuoPalette(Color(0xFFA9673E), Color(0xFF7A4726), Color(0xFFC68B5C), Color.White)
+    SkeuoStyle.RUBY -> SkeuoPalette(Color(0xFFE85C72), Color(0xFFC13952), Color(0xFFF28398), Color.White)
+    SkeuoStyle.EMERALD -> SkeuoPalette(Color(0xFF4FD1C5), Color(0xFF2CA89C), Color(0xFF8CE6DB), Color.White)
 }
 
 /** Botón redondo tipo "gel" (icono clicable, con relieve, brillo especular y sombra). */
@@ -117,14 +121,14 @@ fun SkeuoPlate(
 private fun BoxScope.SpecularHighlight(size: Dp, corner: Boolean = false) {
     Box(
         modifier = Modifier
-            .fillMaxWidth(0.66f)
-            .fillMaxHeight(0.34f)
+            .fillMaxWidth(0.68f)
+            .fillMaxHeight(0.38f)
             .align(Alignment.TopCenter)
-            .padding(top = size * 0.09f)
+            .padding(top = size * 0.08f)
             .clip(if (corner) RoundedCornerShape(50) else RoundedCornerShape(50))
             .background(
                 Brush.verticalGradient(
-                    listOf(Color.White.copy(alpha = 0.42f), Color.White.copy(alpha = 0f))
+                    listOf(Color.White.copy(alpha = 0.60f), Color.White.copy(alpha = 0f))
                 )
             )
     )
