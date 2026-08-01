@@ -4,6 +4,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.AutoFixHigh
@@ -14,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.gestorfotos.ui.GalleryViewModel
+import com.example.gestorfotos.ui.components.PhotoCard
 import com.example.gestorfotos.ui.components.PhotoGrid
 import com.example.gestorfotos.ui.components.SelectionBar
 import com.example.gestorfotos.ui.components.SkeuoIconButton
@@ -104,20 +109,35 @@ fun PhotosScreen(
                     onTap = {}, onLongPress = {}
                 )
             } else {
-                grouped.forEach { (label, items) ->
-                    Text(
-                        label,
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(vertical = 8.dp)
-                    )
-                    PhotoGrid(
-                        photos = items,
-                        selectMode = selectMode,
-                        selected = selected,
-                        emptyMessage = "",
-                        onTap = { if (selectMode) vm.toggleSelect(it.id) else onOpenDetail(it.id) },
-                        onLongPress = { vm.enterSelectMode(); vm.toggleSelect(it.id) }
-                    )
+                // Una sola cuadrícula continua para TODAS las fechas, con los rótulos
+                // (Hoy, Ayer, fecha) como encabezados dentro de ella. Antes cada fecha
+                // tenía su propia cuadrícula metida en un Column sin scroll propio, y
+                // por eso no se podía bajar más allá de lo que cabía en una pantalla.
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(3),
+                    contentPadding = PaddingValues(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    grouped.forEach { (label, items) ->
+                        item(span = { GridItemSpan(maxLineSpan) }, key = "header_$label") {
+                            Text(
+                                label,
+                                style = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
+                        }
+                        items(items, key = { it.id }) { photo ->
+                            PhotoCard(
+                                photo = photo,
+                                selectMode = selectMode,
+                                isSelected = photo.id in selected,
+                                onTap = { if (selectMode) vm.toggleSelect(photo.id) else onOpenDetail(photo.id) },
+                                onLongPress = { vm.enterSelectMode(); vm.toggleSelect(photo.id) }
+                            )
+                        }
+                    }
                 }
             }
         }

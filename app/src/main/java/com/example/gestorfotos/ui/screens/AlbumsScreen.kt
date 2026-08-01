@@ -20,8 +20,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import com.example.gestorfotos.data.Album
 import com.example.gestorfotos.ui.GalleryViewModel
 import com.example.gestorfotos.ui.components.PhotoGrid
@@ -59,17 +62,19 @@ fun AlbumsScreen(vm: GalleryViewModel, onOpenAlbum: (Long) -> Unit, onOpenFolder
             }
 
             items(albums, key = { "album_${it.id}" }) { album ->
-                val count = photos.count { it.albumId == album.id }
+                val albumPhotos = photos.filter { it.albumId == album.id }
+                val cover = albumPhotos.maxByOrNull { it.dateAddedMillis }
                 Card(
                     onClick = { onOpenAlbum(album.id) },
                     colors = CardDefaults.cardColors(containerColor = SurfaceRaised),
                     shape = RoundedCornerShape(14.dp)
                 ) {
-                    Column(Modifier.padding(14.dp)) {
-                        SkeuoPlate(Icons.Outlined.Folder, null, SkeuoStyle.LEATHER, 40.dp)
-                        Spacer(Modifier.height(14.dp))
-                        Text(album.name, fontWeight = FontWeight.SemiBold)
-                        Text("$count fotos", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Column {
+                        AlbumCover(cover?.displayUri, Icons.Outlined.Folder, SkeuoStyle.LEATHER)
+                        Column(Modifier.padding(10.dp)) {
+                            Text(album.name, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                            Text("${albumPhotos.size} fotos", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
                 }
             }
@@ -112,11 +117,12 @@ fun AlbumsScreen(vm: GalleryViewModel, onOpenAlbum: (Long) -> Unit, onOpenFolder
                         colors = CardDefaults.cardColors(containerColor = SurfaceRaised.copy(alpha = 0.85f)),
                         shape = RoundedCornerShape(14.dp)
                     ) {
-                        Column(Modifier.padding(14.dp)) {
-                            SkeuoPlate(Icons.Outlined.PhoneAndroid, null, SkeuoStyle.CHROME, 40.dp)
-                            Spacer(Modifier.height(14.dp))
-                            Text(folder.name, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                            Text("${folder.photoCount} fotos", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Column {
+                            AlbumCover(folder.coverUri, Icons.Outlined.PhoneAndroid, SkeuoStyle.CHROME)
+                            Column(Modifier.padding(10.dp)) {
+                                Text(folder.name, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                                Text("${folder.photoCount} fotos", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                         }
                     }
                 }
@@ -129,6 +135,28 @@ fun AlbumsScreen(vm: GalleryViewModel, onOpenAlbum: (Long) -> Unit, onOpenFolder
             onDismiss = { showNewAlbumDialog = false },
             onCreate = { name -> vm.createAlbum(name); showNewAlbumDialog = false }
         )
+    }
+}
+
+@Composable
+private fun AlbumCover(uri: android.net.Uri?, fallbackIcon: androidx.compose.ui.graphics.vector.ImageVector, style: SkeuoStyle) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(88.dp)
+            .clip(RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp)),
+        contentAlignment = Alignment.Center
+    ) {
+        if (uri != null) {
+            AsyncImage(
+                model = uri,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            SkeuoPlate(fallbackIcon, null, style, 40.dp)
+        }
     }
 }
 
