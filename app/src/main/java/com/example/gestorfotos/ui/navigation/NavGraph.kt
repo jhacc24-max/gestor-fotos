@@ -12,6 +12,9 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -59,7 +62,18 @@ fun GestorFotosNavHost(viewModel: GalleryViewModel, activity: ComponentActivity)
                             },
                             icon = {
                                 val isSelected = currentRoute?.hierarchy?.any { it.route == dest.route } == true
-                                SkeuoIcon(dest.icon, dest.label, dest.style, size = 28.dp, selected = isSelected)
+                                if (dest == Dest.Fotos) {
+                                    // Mismo glifo del ícono principal de la app (mancha turquesa + foto),
+                                    // para que la pestaña "Fotos" se vea idéntica al ícono de instalación.
+                                    Icon(
+                                        painter = painterResource(id = com.example.gestorfotos.R.drawable.ic_launcher_foreground),
+                                        contentDescription = dest.label,
+                                        tint = Color.Unspecified,
+                                        modifier = Modifier.size(28.dp).alpha(if (isSelected) 1f else 0.55f)
+                                    )
+                                } else {
+                                    SkeuoIcon(dest.icon, dest.label, dest.style, size = 28.dp, selected = isSelected)
+                                }
                             },
                             label = { Text(dest.label) }
                         )
