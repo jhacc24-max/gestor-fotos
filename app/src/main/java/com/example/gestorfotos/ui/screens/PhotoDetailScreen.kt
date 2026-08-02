@@ -8,9 +8,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -22,6 +22,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -30,6 +33,8 @@ import com.example.gestorfotos.ui.GalleryViewModel
 import com.example.gestorfotos.ui.components.SkeuoIconButton
 import com.example.gestorfotos.ui.components.SkeuoStyle
 import com.yalantis.ucrop.UCrop
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import java.io.File
 
 private val TAG_VOCAB = listOf(
@@ -52,6 +57,9 @@ fun PhotoDetailScreen(vm: GalleryViewModel, photoId: Long, onClose: () -> Unit) 
     // Al tocar la foto se ocultan los controles para que se vea a pantalla casi completa;
     // se tocan de nuevo para que vuelvan a aparecer.
     var chromeVisible by remember { mutableStateOf(true) }
+    // Zoom: se reinicia cada vez que cambias de foto (photoId como key de remember).
+    var scale by remember(photoId) { mutableStateOf(1f) }
+    var offset by remember(photoId) { mutableStateOf(Offset.Zero) }
 
     LaunchedEffect(photoId) { vm.openDetail(photoId) }
 
@@ -113,22 +121,52 @@ fun PhotoDetailScreen(vm: GalleryViewModel, photoId: Long, onClose: () -> Unit) 
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
             // La foto ocupa todo el espacio disponible y se ve COMPLETA (sin recortar),
-            // ajustándose al ancho o alto según su proporción real.
+            // ajustándose al ancho o alto según su proporción real. Admite pellizcar para
+            // hacer zoom, arrastrar con el zoom activo, doble toque para acercar/alejar,
+            // y un toque simple para ocultar/mostrar los controles.
             Box(
                 Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) { chromeVisible = !chromeVisible },
+                    .pointerInput(photoId) {
+                        coroutineScope {
+                            launch {
+                                detectTapGestures(
+                                    onTap = { chromeVisible = !chromeVisible },
+                                    onDoubleTap = {
+                                        if (scale > 1f) {
+                                            scale = 1f
+                                            offset = Offset.Zero
+                                        } else {
+                                            scale = 2.5f
+                                        }
+                                    }
+                                )
+                            }
+                            launch {
+                                detectTransformGestures { _, pan, zoom, _ ->
+                                    val newScale = (scale * zoom).coerceIn(1f, 6f)
+                                    scale = newScale
+                                    offset = if (newScale <= 1f) Offset.Zero else offset + pan
+                                }
+                            }
+                        }
+                    },
                 contentAlignment = Alignment.Center
             ) {
                 AsyncImage(
                     model = photo.displayUri,
                     contentDescription = null,
                     contentScale = ContentScale.Fit,
-                    modifier = Modifier.fillMaxSize().rotate(photo.rotationDegrees.toFloat())
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer(
+                            scaleX = scale,
+                            scaleY = scale,
+                            translationX = offset.x,
+                            translationY = offset.y
+                        )
+                        .rotate(photo.rotationDegrees.toFloat())
                 )
             }
 
