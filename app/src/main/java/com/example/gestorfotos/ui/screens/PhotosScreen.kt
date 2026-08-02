@@ -3,6 +3,7 @@ package com.example.gestorfotos.ui.screens
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import android.content.Intent
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -15,6 +16,7 @@ import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.gestorfotos.ui.GalleryViewModel
@@ -44,6 +46,32 @@ private fun rememberTrashRequester(vm: GalleryViewModel): (List<Long>) -> Unit {
     }
 }
 
+/** Comparte una o varias fotos seleccionadas de una sola vez. */
+@Composable
+private fun rememberShareRequester(vm: GalleryViewModel): (List<Long>) -> Unit {
+    val context = LocalContext.current
+    val allPhotos by vm.photos.collectAsState()
+    return { ids ->
+        val uris = ArrayList(allPhotos.filter { it.id in ids }.map { it.displayUri })
+        if (uris.isNotEmpty()) {
+            val intent = if (uris.size == 1) {
+                Intent(Intent.ACTION_SEND).apply {
+                    type = "image/*"
+                    putExtra(Intent.EXTRA_STREAM, uris.first())
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+            } else {
+                Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+                    type = "image/*"
+                    putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+            }
+            context.startActivity(Intent.createChooser(intent, "Compartir"))
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PhotosScreen(
@@ -57,6 +85,7 @@ fun PhotosScreen(
     val selected by vm.selected.collectAsState()
     val albums by vm.albums.collectAsState()
     val requestTrash = rememberTrashRequester(vm)
+    val requestShare = rememberShareRequester(vm)
 
     val sdf = remember { SimpleDateFormat("d MMM", Locale("es", "ES")) }
     val grouped = remember(photos) {
@@ -96,6 +125,7 @@ fun PhotosScreen(
                 onMoveTo = { id, name -> vm.moveSelectedTo(id, name) },
                 onNewAlbum = { vm.createAlbum("Nuevo álbum", assignSelected = true) },
                 onFavorite = { vm.setFavoriteSelected(true) },
+                onShare = { requestShare(selected.toList()) },
                 onTrash = { requestTrash(selected.toList()) },
                 onCancel = { vm.exitSelectMode() }
             )
@@ -152,6 +182,7 @@ fun FavoritesScreen(vm: GalleryViewModel, onOpenDetail: (Long) -> Unit) {
     val selected by vm.selected.collectAsState()
     val albums by vm.albums.collectAsState()
     val requestTrash = rememberTrashRequester(vm)
+    val requestShare = rememberShareRequester(vm)
 
     Scaffold(
         topBar = {
@@ -171,6 +202,7 @@ fun FavoritesScreen(vm: GalleryViewModel, onOpenDetail: (Long) -> Unit) {
                 onMoveTo = { id, name -> vm.moveSelectedTo(id, name) },
                 onNewAlbum = { vm.createAlbum("Nuevo álbum", assignSelected = true) },
                 onFavorite = { vm.setFavoriteSelected(true) },
+                onShare = { requestShare(selected.toList()) },
                 onTrash = { requestTrash(selected.toList()) },
                 onCancel = { vm.exitSelectMode() }
             )

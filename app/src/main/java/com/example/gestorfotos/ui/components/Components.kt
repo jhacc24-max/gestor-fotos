@@ -15,10 +15,13 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Circle
+import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -147,9 +150,12 @@ fun SelectionBar(
     onMoveTo: (Long, String) -> Unit,
     onNewAlbum: () -> Unit,
     onFavorite: () -> Unit,
+    onShare: () -> Unit,
     onTrash: () -> Unit,
     onCancel: () -> Unit
 ) {
+    var showMoveDialog by remember { mutableStateOf(false) }
+
     AnimatedVisibility(
         visible = count > 0,
         enter = slideInVertically { it } + fadeIn(),
@@ -164,35 +170,60 @@ fun SelectionBar(
                     Text("$count seleccionada${if (count > 1) "s" else ""}", style = MaterialTheme.typography.titleMedium)
                     TextButton(onClick = onCancel) { Text("Cancelar") }
                 }
-                Spacer(Modifier.height(8.dp))
-                Row(
-                    Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    albumNames.forEach { (id, name) ->
-                        AssistChip(onClick = { onMoveTo(id, name) }, label = { Text("Mover a $name") })
-                    }
-                    AssistChip(onClick = onNewAlbum, label = { Text("+ Nuevo álbum") })
-                }
-                Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedButton(onClick = onFavorite, modifier = Modifier.weight(1f)) {
-                        SkeuoIcon(Icons.Filled.Star, null, SkeuoStyle.BRASS, size = 22.dp)
-                        Spacer(Modifier.width(6.dp))
-                        Text("Favorito")
-                    }
-                    Button(
-                        onClick = onTrash,
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                    ) {
-                        SkeuoIcon(Icons.Filled.DeleteOutline, null, SkeuoStyle.RUBY, size = 22.dp)
-                        Spacer(Modifier.width(6.dp))
-                        Text("Papelera")
-                    }
+                Spacer(Modifier.height(10.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    SelectionAction(Icons.Filled.Share, "Compartir", SkeuoStyle.BRASS, onShare)
+                    SelectionAction(Icons.Outlined.Folder, "Mover a", SkeuoStyle.LEATHER) { showMoveDialog = true }
+                    SelectionAction(Icons.Filled.Star, "Favorito", SkeuoStyle.BRASS, onFavorite)
+                    SelectionAction(Icons.Filled.DeleteOutline, "Papelera", SkeuoStyle.RUBY, onTrash)
                 }
             }
         }
+    }
+
+    if (showMoveDialog) {
+        AlertDialog(
+            onDismissRequest = { showMoveDialog = false },
+            title = { Text("Mover a álbum") },
+            text = {
+                Column {
+                    albumNames.forEach { (id, name) ->
+                        TextButton(
+                            onClick = { onMoveTo(id, name); showMoveDialog = false },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
+                                Icon(Icons.Outlined.Folder, null, modifier = Modifier.size(20.dp))
+                                Spacer(Modifier.width(10.dp))
+                                Text(name)
+                            }
+                        }
+                    }
+                    if (albumNames.isNotEmpty()) Spacer(Modifier.height(4.dp))
+                    TextButton(
+                        onClick = { onNewAlbum(); showMoveDialog = false },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
+                            Icon(Icons.Filled.Add, null, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(10.dp))
+                            Text("Nuevo álbum")
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { showMoveDialog = false }) { Text("Cerrar") } }
+        )
+    }
+}
+
+@Composable
+private fun SelectionAction(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, style: SkeuoStyle, onClick: () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable(onClick = onClick).padding(4.dp)) {
+        SkeuoIcon(icon, null, style, size = 34.dp)
+        Spacer(Modifier.height(4.dp))
+        Text(label, style = MaterialTheme.typography.labelSmall)
     }
 }
 

@@ -3,6 +3,7 @@ package com.example.gestorfotos.ui.screens
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import android.content.Intent
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -22,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -33,6 +35,26 @@ import com.example.gestorfotos.ui.components.SkeuoIconButton
 import com.example.gestorfotos.ui.components.SkeuoPlate
 import com.example.gestorfotos.ui.components.SkeuoStyle
 import com.example.gestorfotos.ui.theme.SurfaceRaised
+
+/** Comparte una o varias fotos de una sola vez. */
+private fun shareUris(context: android.content.Context, uris: List<android.net.Uri>) {
+    if (uris.isEmpty()) return
+    val list = ArrayList(uris)
+    val intent = if (list.size == 1) {
+        Intent(Intent.ACTION_SEND).apply {
+            type = "image/*"
+            putExtra(Intent.EXTRA_STREAM, list.first())
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+    } else {
+        Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+            type = "image/*"
+            putParcelableArrayListExtra(Intent.EXTRA_STREAM, list)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+    }
+    context.startActivity(Intent.createChooser(intent, "Compartir"))
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -177,6 +199,7 @@ private fun NewAlbumDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AlbumDetailScreen(vm: GalleryViewModel, albumId: Long, onBack: () -> Unit, onOpenDetail: (Long) -> Unit) {
+    val context = LocalContext.current
     val albums by vm.albums.collectAsState()
     val photos by vm.photos.collectAsState()
     val album = albums.find { it.id == albumId }
@@ -220,6 +243,7 @@ fun AlbumDetailScreen(vm: GalleryViewModel, albumId: Long, onBack: () -> Unit, o
                 onMoveTo = { id, name -> vm.moveSelectedTo(id, name) },
                 onNewAlbum = { vm.createAlbum("Nuevo álbum", assignSelected = true) },
                 onFavorite = { vm.setFavoriteSelected(true) },
+                onShare = { shareUris(context, photos.filter { it.id in selected }.map { it.displayUri }) },
                 onTrash = { requestTrash(selected.toList()) },
                 onCancel = { vm.exitSelectMode() }
             )
@@ -275,6 +299,7 @@ fun AlbumDetailScreen(vm: GalleryViewModel, albumId: Long, onBack: () -> Unit, o
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SystemFolderScreen(vm: GalleryViewModel, bucketId: String, onBack: () -> Unit, onOpenDetail: (Long) -> Unit) {
+    val context = LocalContext.current
     val folders by vm.systemFolders.collectAsState()
     val photos by vm.photos.collectAsState()
     val albums by vm.albums.collectAsState()
@@ -309,6 +334,7 @@ fun SystemFolderScreen(vm: GalleryViewModel, bucketId: String, onBack: () -> Uni
                 onMoveTo = { id, name -> vm.moveSelectedTo(id, name) },
                 onNewAlbum = { vm.createAlbum("Nuevo álbum", assignSelected = true) },
                 onFavorite = { vm.setFavoriteSelected(true) },
+                onShare = { shareUris(context, folderPhotos.filter { it.id in selected }.map { it.displayUri }) },
                 onTrash = { requestTrash(selected.toList()) },
                 onCancel = { vm.exitSelectMode() }
             )
