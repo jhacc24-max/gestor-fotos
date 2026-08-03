@@ -29,6 +29,8 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.example.gestorfotos.data.Album
 import com.example.gestorfotos.ui.GalleryViewModel
+import com.example.gestorfotos.ui.components.PngIcon
+import com.example.gestorfotos.ui.components.PngIconButton
 import com.example.gestorfotos.ui.components.PhotoGrid
 import com.example.gestorfotos.ui.components.SelectionBar
 import com.example.gestorfotos.ui.components.SkeuoIconButton
@@ -111,7 +113,7 @@ fun AlbumsScreen(vm: GalleryViewModel, onOpenAlbum: (Long) -> Unit, onOpenFolder
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        SkeuoPlate(Icons.Filled.Add, null, SkeuoStyle.CHROME, 36.dp)
+                        PngIcon(com.example.gestorfotos.R.drawable.ic_nuevo_album, null, size = 36.dp)
                         Spacer(Modifier.height(6.dp))
                         Text("Nuevo álbum", style = MaterialTheme.typography.labelSmall)
                     }
@@ -227,11 +229,11 @@ fun AlbumDetailScreen(vm: GalleryViewModel, albumId: Long, onBack: () -> Unit, o
         topBar = {
             TopAppBar(
                 title = { Text(album?.name ?: "", fontWeight = FontWeight.Bold) },
-                navigationIcon = { SkeuoIconButton(Icons.Filled.ArrowBack, "Volver", SkeuoStyle.CHROME, 34.dp, onBack) },
+                navigationIcon = { PngIconButton(com.example.gestorfotos.R.drawable.ic_atras, "Volver", 34.dp, onBack) },
                 actions = {
-                    SkeuoIconButton(Icons.Filled.Edit, "Renombrar", SkeuoStyle.BRASS, 34.dp) { renaming = true }
+                    PngIconButton(com.example.gestorfotos.R.drawable.ic_renombrar, "Renombrar", 34.dp) { renaming = true }
                     Spacer(Modifier.width(8.dp))
-                    SkeuoIconButton(Icons.Filled.Delete, "Eliminar álbum", SkeuoStyle.RUBY, 34.dp) { deleteConfirm = true }
+                    PngIconButton(com.example.gestorfotos.R.drawable.ic_papelera, "Eliminar álbum", 34.dp) { deleteConfirm = true }
                     Spacer(Modifier.width(8.dp))
                 }
             )
@@ -324,7 +326,7 @@ fun SystemFolderScreen(vm: GalleryViewModel, bucketId: String, onBack: () -> Uni
         topBar = {
             TopAppBar(
                 title = { Text(folder?.name ?: "Carpeta", fontWeight = FontWeight.Bold) },
-                navigationIcon = { SkeuoIconButton(Icons.Filled.ArrowBack, "Volver", SkeuoStyle.CHROME, 34.dp, onBack) }
+                navigationIcon = { PngIconButton(com.example.gestorfotos.R.drawable.ic_atras, "Volver", 34.dp, onBack) }
             )
         },
         bottomBar = {

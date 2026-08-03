@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.Image
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
@@ -28,14 +29,47 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.example.gestorfotos.repository.UiPhoto
 import com.example.gestorfotos.ui.theme.Amber
 import com.example.gestorfotos.ui.theme.Teal
+
+/**
+ * Muestra uno de los PNG propios del usuario (cámara/álbum/papelera/etc.) como ícono.
+ * A diferencia de SkeuoIcon (que tinta un glifo vectorial), estos PNG ya traen su
+ * propio color y marco, así que se muestran tal cual, sin tintar.
+ */
+@Composable
+fun PngIcon(res: Int, contentDescription: String?, size: Dp = 34.dp, selected: Boolean = true) {
+    Image(
+        painter = painterResource(id = res),
+        contentDescription = contentDescription,
+        contentScale = ContentScale.Crop,
+        modifier = Modifier
+            .size(size)
+            .clip(RoundedCornerShape(size / 4))
+            .alpha(if (selected) 1f else 0.5f)
+    )
+}
+
+@Composable
+fun PngIconButton(res: Int, contentDescription: String?, size: Dp = 34.dp, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(size + 14.dp)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        PngIcon(res, contentDescription, size)
+    }
+}
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -121,7 +155,7 @@ fun PhotoCard(
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.TopEnd).padding(6.dp)
         ) {
-            SkeuoIcon(Icons.Filled.Star, contentDescription = "Favorita", style = SkeuoStyle.BRASS, size = 22.dp)
+            PngIcon(com.example.gestorfotos.R.drawable.ic_favorito, contentDescription = "Favorita", size = 22.dp)
         }
     }
 }
@@ -172,10 +206,10 @@ fun SelectionBar(
                 }
                 Spacer(Modifier.height(10.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    SelectionAction(Icons.Filled.Share, "Compartir", SkeuoStyle.BRASS, onShare)
-                    SelectionAction(Icons.Outlined.Folder, "Mover a", SkeuoStyle.LEATHER) { showMoveDialog = true }
-                    SelectionAction(Icons.Filled.Star, "Favorito", SkeuoStyle.BRASS, onFavorite)
-                    SelectionAction(Icons.Filled.DeleteOutline, "Papelera", SkeuoStyle.RUBY, onTrash)
+                    SelectionAction(com.example.gestorfotos.R.drawable.ic_compartir, "Compartir", onShare)
+                    SelectionAction(com.example.gestorfotos.R.drawable.ic_mover, "Mover a") { showMoveDialog = true }
+                    SelectionAction(com.example.gestorfotos.R.drawable.ic_favorito, "Favorito", onFavorite)
+                    SelectionAction(com.example.gestorfotos.R.drawable.ic_papelera, "Papelera", onTrash)
                 }
             }
         }
@@ -205,7 +239,7 @@ fun SelectionBar(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
-                            Icon(Icons.Filled.Add, null, modifier = Modifier.size(20.dp))
+                            PngIcon(com.example.gestorfotos.R.drawable.ic_nuevo_album, null, size = 20.dp)
                             Spacer(Modifier.width(10.dp))
                             Text("Nuevo álbum")
                         }
@@ -219,9 +253,9 @@ fun SelectionBar(
 }
 
 @Composable
-private fun SelectionAction(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, style: SkeuoStyle, onClick: () -> Unit) {
+private fun SelectionAction(res: Int, label: String, onClick: () -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable(onClick = onClick).padding(4.dp)) {
-        SkeuoIcon(icon, null, style, size = 34.dp)
+        PngIcon(res, null, size = 38.dp)
         Spacer(Modifier.height(4.dp))
         Text(label, style = MaterialTheme.typography.labelSmall)
     }

@@ -30,6 +30,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.example.gestorfotos.ui.GalleryViewModel
+import com.example.gestorfotos.ui.components.PngIcon
+import com.example.gestorfotos.ui.components.PngIconButton
 import com.example.gestorfotos.ui.components.SkeuoIconButton
 import com.example.gestorfotos.ui.components.SkeuoStyle
 import com.yalantis.ucrop.UCrop
@@ -103,14 +105,13 @@ fun PhotoDetailScreen(vm: GalleryViewModel, photoId: Long, onClose: () -> Unit) 
             AnimatedVisibility(visible = chromeVisible, enter = fadeIn(), exit = fadeOut()) {
                 TopAppBar(
                     title = { Text("") },
-                    navigationIcon = { SkeuoIconButton(Icons.Filled.Close, "Cerrar", SkeuoStyle.CHROME, 36.dp, onClose) },
+                    navigationIcon = { PngIconButton(com.example.gestorfotos.R.drawable.ic_cerrar, "Cerrar", 36.dp, onClose) },
                     actions = {
-                        SkeuoIconButton(Icons.Filled.Sell, "Etiquetas", SkeuoStyle.LEATHER, 34.dp) { showTags = true }
+                        PngIconButton(com.example.gestorfotos.R.drawable.ic_etiqueta, "Etiquetas", 34.dp) { showTags = true }
                         Spacer(Modifier.width(6.dp))
-                        SkeuoIconButton(
-                            icon = if (photo.isFavorite) Icons.Filled.Star else Icons.Filled.StarBorder,
+                        PngIconButton(
+                            res = com.example.gestorfotos.R.drawable.ic_favorito,
                             contentDescription = "Favorita",
-                            style = if (photo.isFavorite) SkeuoStyle.BRASS else SkeuoStyle.CHROME,
                             size = 36.dp
                         ) { vm.toggleFavorite(photo.id, photo.isFavorite) }
                         Spacer(Modifier.width(8.dp))
@@ -174,10 +175,10 @@ fun PhotoDetailScreen(vm: GalleryViewModel, photoId: Long, onClose: () -> Unit) 
                 Column(Modifier.padding(horizontal = 20.dp)) {
                     Spacer(Modifier.height(12.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                        DetailAction(Icons.Filled.RotateRight, "Rotar", SkeuoStyle.CHROME) { vm.rotate(photo.id) }
-                        DetailAction(Icons.Filled.Crop, "Recortar", SkeuoStyle.EMERALD) { launchCrop(photo.uri) }
-                        DetailAction(Icons.Filled.Share, "Compartir", SkeuoStyle.BRASS) { showShareSheet = true }
-                        DetailAction(Icons.Filled.DeleteOutline, "Eliminar", SkeuoStyle.RUBY) { confirmDelete = true }
+                        DetailAction(com.example.gestorfotos.R.drawable.ic_rotar, "Rotar") { vm.rotate(photo.id) }
+                        DetailAction(com.example.gestorfotos.R.drawable.ic_recortar, "Recortar") { launchCrop(photo.uri) }
+                        DetailAction(com.example.gestorfotos.R.drawable.ic_compartir, "Compartir") { showShareSheet = true }
+                        DetailAction(com.example.gestorfotos.R.drawable.ic_papelera, "Eliminar") { confirmDelete = true }
                     }
 
                     Spacer(Modifier.height(16.dp))
@@ -246,9 +247,9 @@ fun PhotoDetailScreen(vm: GalleryViewModel, photoId: Long, onClose: () -> Unit) 
 }
 
 @Composable
-private fun DetailAction(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, style: SkeuoStyle, onClick: () -> Unit) {
+private fun DetailAction(res: Int, label: String, onClick: () -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        SkeuoIconButton(icon = icon, contentDescription = label, style = style, size = 46.dp, onClick = onClick)
+        PngIconButton(res = res, contentDescription = label, size = 46.dp, onClick = onClick)
         Spacer(Modifier.height(4.dp))
         Text(label, style = MaterialTheme.typography.labelSmall)
     }

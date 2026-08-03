@@ -13,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -25,15 +26,16 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.navigation.NavType
 import com.example.gestorfotos.ui.GalleryViewModel
+import com.example.gestorfotos.ui.components.PngIcon
 import com.example.gestorfotos.ui.components.SkeuoIcon
 import com.example.gestorfotos.ui.components.SkeuoStyle
 import com.example.gestorfotos.ui.screens.*
 
-private sealed class Dest(val route: String, val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector, val style: SkeuoStyle) {
-    object Fotos : Dest("fotos", "Fotos", Icons.Filled.Image, SkeuoStyle.CHROME)
-    object Albumes : Dest("albumes", "Álbumes", Icons.Outlined.Folder, SkeuoStyle.LEATHER)
-    object Buscar : Dest("buscar", "Buscar", Icons.Outlined.Search, SkeuoStyle.BRASS)
-    object Favoritos : Dest("favoritos", "Favoritos", Icons.Filled.Star, SkeuoStyle.BRASS)
+private sealed class Dest(val route: String, val label: String, val pngRes: Int) {
+    object Fotos : Dest("fotos", "Fotos", com.example.gestorfotos.R.mipmap.ic_launcher)
+    object Albumes : Dest("albumes", "Álbumes", com.example.gestorfotos.R.drawable.ic_album)
+    object Buscar : Dest("buscar", "Buscar", com.example.gestorfotos.R.drawable.ic_buscar)
+    object Favoritos : Dest("favoritos", "Favoritos", com.example.gestorfotos.R.drawable.ic_favorito)
 }
 
 private val bottomDestinations = listOf(Dest.Fotos, Dest.Albumes, Dest.Buscar, Dest.Favoritos)
@@ -62,18 +64,12 @@ fun GestorFotosNavHost(viewModel: GalleryViewModel, activity: ComponentActivity)
                             },
                             icon = {
                                 val isSelected = currentRoute?.hierarchy?.any { it.route == dest.route } == true
-                                if (dest == Dest.Fotos) {
-                                    // Mismo glifo del ícono principal de la app (mancha turquesa + foto),
-                                    // para que la pestaña "Fotos" se vea idéntica al ícono de instalación.
-                                    Icon(
-                                        painter = painterResource(id = com.example.gestorfotos.R.drawable.ic_launcher_foreground),
-                                        contentDescription = dest.label,
-                                        tint = Color.Unspecified,
-                                        modifier = Modifier.size(28.dp).alpha(if (isSelected) 1f else 0.55f)
-                                    )
-                                } else {
-                                    SkeuoIcon(dest.icon, dest.label, dest.style, size = 28.dp, selected = isSelected)
-                                }
+                                PngIcon(
+                                    res = dest.pngRes,
+                                    contentDescription = dest.label,
+                                    size = if (dest == Dest.Fotos) 30.dp else 28.dp,
+                                    selected = isSelected
+                                )
                             },
                             label = { Text(dest.label) }
                         )

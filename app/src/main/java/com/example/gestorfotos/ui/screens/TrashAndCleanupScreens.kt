@@ -22,6 +22,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.gestorfotos.ui.GalleryViewModel
+import com.example.gestorfotos.ui.components.PngIcon
+import com.example.gestorfotos.ui.components.PngIconButton
 import com.example.gestorfotos.ui.components.PhotoCard
 import com.example.gestorfotos.ui.components.SkeuoIconButton
 import com.example.gestorfotos.ui.components.SkeuoPlate
@@ -78,11 +80,11 @@ fun TrashScreen(vm: GalleryViewModel, onBack: () -> Unit) {
         topBar = {
             TopAppBar(
                 title = { Text("Papelera", fontWeight = FontWeight.Bold) },
-                navigationIcon = { SkeuoIconButton(Icons.Filled.ArrowBack, "Volver", SkeuoStyle.CHROME, 36.dp, onBack) },
+                navigationIcon = { PngIconButton(com.example.gestorfotos.R.drawable.ic_atras, "Volver", 36.dp, onBack) },
                 actions = {
                     if (trashed.isNotEmpty()) {
                         Spacer(Modifier.width(4.dp))
-                        SkeuoIconButton(Icons.Filled.DeleteForever, "Vaciar", SkeuoStyle.RUBY, 36.dp) { confirmEmpty = true }
+                        PngIconButton(com.example.gestorfotos.R.drawable.ic_vaciar_papelera, "Vaciar", 36.dp) { confirmEmpty = true }
                         Spacer(Modifier.width(12.dp))
                     }
                 }
@@ -185,13 +187,13 @@ fun CleanupScreen(vm: GalleryViewModel, onBack: () -> Unit) {
         topBar = {
             TopAppBar(
                 title = { Text("Sugerencias de limpieza", fontWeight = FontWeight.Bold) },
-                navigationIcon = { SkeuoIconButton(Icons.Filled.ArrowBack, "Volver", SkeuoStyle.CHROME, 36.dp, onBack) }
+                navigationIcon = { PngIconButton(com.example.gestorfotos.R.drawable.ic_atras, "Volver", 36.dp, onBack) }
             )
         }
     ) { padding ->
         Column(Modifier.padding(padding).padding(horizontal = 16.dp).verticalScroll(rememberScrollState())) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 8.dp)) {
-                SkeuoPlate(Icons.Filled.AutoFixHigh, null, SkeuoStyle.EMERALD, 32.dp)
+                PngIcon(com.example.gestorfotos.R.drawable.ic_limpieza, null, size = 32.dp)
                 Spacer(Modifier.width(10.dp))
                 Text(
                     "Basado en similitud visual (pHash) y nitidez, calculado en segundo plano. Revisa antes de borrar.",

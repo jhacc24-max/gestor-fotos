@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.gestorfotos.ui.GalleryViewModel
+import com.example.gestorfotos.ui.components.PngIconButton
 import com.example.gestorfotos.ui.components.PhotoCard
 import com.example.gestorfotos.ui.components.PhotoGrid
 import com.example.gestorfotos.ui.components.SelectionBar
@@ -108,9 +109,9 @@ fun PhotosScreen(
             TopAppBar(
                 title = { Text("Fotos", fontWeight = FontWeight.Bold) },
                 actions = {
-                    SkeuoIconButton(Icons.Filled.AutoFixHigh, "Sugerencias de limpieza", SkeuoStyle.EMERALD, 34.dp, onOpenCleanup)
+                    PngIconButton(com.example.gestorfotos.R.drawable.ic_limpieza, "Sugerencias de limpieza", 34.dp, onOpenCleanup)
                     Spacer(Modifier.width(8.dp))
-                    SkeuoIconButton(Icons.Filled.DeleteOutline, "Papelera", SkeuoStyle.RUBY, 34.dp, onOpenTrash)
+                    PngIconButton(com.example.gestorfotos.R.drawable.ic_papelera, "Papelera", 34.dp, onOpenTrash)
                     Spacer(Modifier.width(4.dp))
                     TextButton(onClick = { if (selectMode) vm.exitSelectMode() else vm.enterSelectMode() }) {
                         Text(if (selectMode) "Cancelar" else "Seleccionar")
