@@ -33,6 +33,7 @@ fun SearchScreen(vm: GalleryViewModel, onOpenDetail: (Long) -> Unit) {
                     it.displayName.lowercase().contains(q))
         }
     }
+    LaunchedEffect(results) { vm.setDetailContext(results.map { it.id }) }
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Buscar", fontWeight = FontWeight.Bold) }) }

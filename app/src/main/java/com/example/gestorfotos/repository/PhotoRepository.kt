@@ -9,6 +9,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import com.example.gestorfotos.data.AppDatabase
+import com.example.gestorfotos.data.FolderMeta
 import com.example.gestorfotos.data.PhotoMeta
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
@@ -23,12 +24,15 @@ data class MediaImage(
     val bucketName: String
 )
 
-/** Carpeta real del teléfono (Cámara, WhatsApp Images, Descargas, etc.), de solo lectura. */
+/** Carpeta real del teléfono (Cámara, WhatsApp Images, Descargas, etc.), de solo lectura
+ *  en cuanto a su existencia/nombre, pero con grupo y favorito editables por el usuario. */
 data class SystemFolder(
     val bucketId: String,
     val name: String,
     val photoCount: Int,
-    val coverUri: Uri
+    val coverUri: Uri,
+    val groupName: String? = null,
+    val isFavorite: Boolean = false
 )
 
 /** Modelo unificado que usa la UI: fusiona la foto real (MediaStore) con sus metadatos (Room). */
@@ -58,10 +62,22 @@ class PhotoRepository(private val context: Context) {
     private val db = AppDatabase.getInstance(context)
     private val albumDao = db.albumDao()
     private val metaDao = db.photoMetaDao()
+    private val folderMetaDao = db.folderMetaDao()
 
     private val _mediaImages = MutableStateFlow<List<MediaImage>>(emptyList())
 
     val albums = albumDao.observeAlbums()
+    val folderMeta: Flow<List<FolderMeta>> = folderMetaDao.observeAll()
+
+    suspend fun setFolderGroup(bucketId: String, groupName: String?) {
+        val existing = folderMetaDao.getById(bucketId) ?: FolderMeta(bucketId = bucketId)
+        folderMetaDao.upsert(existing.copy(groupName = groupName?.takeIf { it.isNotBlank() }))
+    }
+
+    suspend fun setFolderFavorite(bucketId: String, favorite: Boolean) {
+        val existing = folderMetaDao.getById(bucketId) ?: FolderMeta(bucketId = bucketId)
+        folderMetaDao.upsert(existing.copy(isFavorite = favorite))
+    }
 
     val photos: Flow<List<UiPhoto>> = combine(_mediaImages, metaDao.observeAll()) { media, metas ->
         val metaById = metas.associateBy { it.mediaStoreId }

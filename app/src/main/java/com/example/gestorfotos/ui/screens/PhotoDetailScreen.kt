@@ -14,6 +14,8 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -48,6 +50,26 @@ private val TAG_VOCAB = listOf(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PhotoDetailScreen(vm: GalleryViewModel, photoId: Long, onClose: () -> Unit) {
+    // Lista de fotos por la que se puede deslizar (la que estaba viendo la pantalla
+    // desde la que se abrió esta foto: Fotos, un álbum, una carpeta, Favoritos o Búsqueda).
+    // Si por algún motivo no hay contexto guardado (p.ej. se abrió la pantalla directo),
+    // se usa una lista de un solo elemento para que igual funcione, sin deslizamiento.
+    val context by vm.detailContext.collectAsState()
+    val orderedIds = remember(context, photoId) {
+        if (photoId in context) context else listOf(photoId)
+    }
+    val initialIndex = remember(orderedIds, photoId) { orderedIds.indexOf(photoId).coerceAtLeast(0) }
+    val pagerState = rememberPagerState(initialPage = initialIndex) { orderedIds.size }
+
+    HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+        val pageId = orderedIds.getOrNull(page) ?: return@HorizontalPager
+        PhotoDetailPage(vm = vm, photoId = pageId, onClose = onClose)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PhotoDetailPage(vm: GalleryViewModel, photoId: Long, onClose: () -> Unit) {
     val context = LocalContext.current
     val photos by vm.photos.collectAsState()
     val albums by vm.albums.collectAsState()

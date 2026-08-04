@@ -103,6 +103,8 @@ fun PhotosScreen(
             }
         }
     }
+    // Para poder deslizar entre fotos en el detalle sin salir y volver a entrar.
+    LaunchedEffect(grouped) { vm.setDetailContext(grouped.values.flatten().map { it.id }) }
 
     Scaffold(
         topBar = {
@@ -184,6 +186,7 @@ fun FavoritesScreen(vm: GalleryViewModel, onOpenDetail: (Long) -> Unit) {
     val albums by vm.albums.collectAsState()
     val requestTrash = rememberTrashRequester(vm)
     val requestShare = rememberShareRequester(vm)
+    LaunchedEffect(favorites) { vm.setDetailContext(favorites.map { it.id }) }
 
     Scaffold(
         topBar = {

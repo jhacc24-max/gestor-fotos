@@ -93,10 +93,36 @@ interface PhotoMetaDao {
     suspend fun delete(id: Long)
 }
 
-@Database(entities = [Album::class, PhotoMeta::class], version = 2, exportSchema = false)
+/**
+ * Preferencias propias de la app para una CARPETA REAL del teléfono (no un álbum
+ * propio): a qué grupo pertenece (ej. "Personal", "Trabajo") y si está marcada como
+ * favorita. bucketId es el identificador de carpeta que entrega el MediaStore. Si no
+ * hay fila para una carpeta, se asume sin grupo y no favorita.
+ */
+@Entity(tableName = "folder_meta")
+data class FolderMeta(
+    @PrimaryKey val bucketId: String,
+    val groupName: String? = null,
+    val isFavorite: Boolean = false
+)
+
+@Dao
+interface FolderMetaDao {
+    @Query("SELECT * FROM folder_meta")
+    fun observeAll(): Flow<List<FolderMeta>>
+
+    @Query("SELECT * FROM folder_meta WHERE bucketId = :bucketId")
+    suspend fun getById(bucketId: String): FolderMeta?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(meta: FolderMeta)
+}
+
+@Database(entities = [Album::class, PhotoMeta::class, FolderMeta::class], version = 3, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun albumDao(): AlbumDao
     abstract fun photoMetaDao(): PhotoMetaDao
+    abstract fun folderMetaDao(): FolderMetaDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null

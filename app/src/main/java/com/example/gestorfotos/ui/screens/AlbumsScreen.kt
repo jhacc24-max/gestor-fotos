@@ -4,12 +4,17 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import android.content.Intent
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
@@ -28,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.example.gestorfotos.data.Album
+import com.example.gestorfotos.repository.SystemFolder
 import com.example.gestorfotos.ui.GalleryViewModel
 import com.example.gestorfotos.ui.components.PngIcon
 import com.example.gestorfotos.ui.components.PngIconButton
@@ -64,7 +70,15 @@ fun AlbumsScreen(vm: GalleryViewModel, onOpenAlbum: (Long) -> Unit, onOpenFolder
     val albums by vm.albums.collectAsState()
     val photos by vm.photos.collectAsState()
     val folders by vm.systemFolders.collectAsState()
+    val groupNames by vm.folderGroupNames.collectAsState()
     var showNewAlbumDialog by remember { mutableStateOf(false) }
+    var showOrganizeDialog by remember { mutableStateOf(false) }
+    var folderToGroup by remember { mutableStateOf<SystemFolder?>(null) }
+
+    val groupedFolders = remember(folders) {
+        folders.groupBy { it.groupName ?: "Sin clasificar" }
+            .toSortedMap(compareBy { if (it == "Sin clasificar") "\uFFFF" else it })
+    }
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Álbumes", fontWeight = FontWeight.Bold) }) }
@@ -123,31 +137,44 @@ fun AlbumsScreen(vm: GalleryViewModel, onOpenAlbum: (Long) -> Unit, onOpenFolder
             if (folders.isNotEmpty()) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     Spacer(Modifier.height(10.dp))
-                    Text(
-                        "Carpetas del teléfono",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        "Las carpetas reales de tu galería (Cámara, WhatsApp, etc.). Solo lectura.",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.height(6.dp))
-                }
-                items(folders, key = { "folder_${it.bucketId}" }) { folder ->
-                    Card(
-                        onClick = { onOpenFolder(folder.bucketId) },
-                        colors = CardDefaults.cardColors(containerColor = SurfaceRaised.copy(alpha = 0.85f)),
-                        shape = RoundedCornerShape(14.dp)
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column {
-                            AlbumCover(folder.coverUri, Icons.Outlined.PhoneAndroid, SkeuoStyle.CHROME)
-                            Column(Modifier.padding(10.dp)) {
-                                Text(folder.name, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                                Text("${folder.photoCount} fotos", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
+                            Text(
+                                "Carpetas del teléfono",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                "Manten presionada una carpeta para agruparla.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
+                        TextButton(onClick = { showOrganizeDialog = true }) { Text("Organizar") }
+                    }
+                    Spacer(Modifier.height(4.dp))
+                }
+                groupedFolders.forEach { (groupLabel, groupFolders) ->
+                    item(span = { GridItemSpan(maxLineSpan) }, key = "grouphdr_$groupLabel") {
+                        Text(
+                            groupLabel,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                        )
+                    }
+                    items(groupFolders, key = { "folder_${it.bucketId}" }) { folder ->
+                        FolderCard(
+                            folder = folder,
+                            onOpen = { onOpenFolder(folder.bucketId) },
+                            onLongPress = { folderToGroup = folder },
+                            onToggleFavorite = { vm.toggleFolderFavorite(folder.bucketId, folder.isFavorite) }
+                        )
                     }
                 }
             }
@@ -158,6 +185,24 @@ fun AlbumsScreen(vm: GalleryViewModel, onOpenAlbum: (Long) -> Unit, onOpenFolder
         NewAlbumDialog(
             onDismiss = { showNewAlbumDialog = false },
             onCreate = { name -> vm.createAlbum(name); showNewAlbumDialog = false }
+        )
+    }
+
+    if (showOrganizeDialog) {
+        OrganizeFoldersDialog(
+            folders = folders,
+            existingGroups = groupNames,
+            onAssign = { bucketId, group -> vm.setFolderGroup(bucketId, group) },
+            onDismiss = { showOrganizeDialog = false }
+        )
+    }
+
+    folderToGroup?.let { folder ->
+        FolderGroupDialog(
+            folder = folder,
+            existingGroups = groupNames,
+            onAssign = { group -> vm.setFolderGroup(folder.bucketId, group); folderToGroup = null },
+            onDismiss = { folderToGroup = null }
         )
     }
 }
@@ -181,6 +226,136 @@ private fun AlbumCover(uri: android.net.Uri?, fallbackIcon: androidx.compose.ui.
         } else {
             SkeuoPlate(fallbackIcon, null, style, 40.dp)
         }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun FolderCard(
+    folder: SystemFolder,
+    onOpen: () -> Unit,
+    onLongPress: () -> Unit,
+    onToggleFavorite: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = SurfaceRaised.copy(alpha = 0.85f),
+        modifier = Modifier.combinedClickable(onClick = onOpen, onLongClick = onLongPress)
+    ) {
+        Column {
+            Box {
+                AlbumCover(folder.coverUri, Icons.Outlined.PhoneAndroid, SkeuoStyle.CHROME)
+                Box(
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(6.dp)
+                        .clickable(onClick = onToggleFavorite)
+                ) {
+                    PngIcon(
+                        com.example.gestorfotos.R.drawable.ic_favorito,
+                        contentDescription = "Favorita",
+                        size = 22.dp,
+                        selected = folder.isFavorite
+                    )
+                }
+            }
+            Column(Modifier.padding(10.dp)) {
+                Text(folder.name, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                Text(
+                    "${folder.photoCount} fotos" + (folder.groupName?.let { " · $it" } ?: ""),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FolderGroupDialog(
+    folder: SystemFolder,
+    existingGroups: List<String>,
+    onAssign: (String?) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var newGroupName by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Agrupar \"${folder.name}\"") },
+        text = {
+            Column {
+                if (existingGroups.isNotEmpty()) {
+                    Text("Grupos existentes", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(4.dp))
+                    existingGroups.forEach { g ->
+                        TextButton(onClick = { onAssign(g) }, modifier = Modifier.fillMaxWidth()) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) { Text(g) }
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+                OutlinedTextField(
+                    value = newGroupName,
+                    onValueChange = { newGroupName = it },
+                    label = { Text("Nuevo grupo") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (folder.groupName != null) {
+                    Spacer(Modifier.height(8.dp))
+                    TextButton(onClick = { onAssign(null) }) { Text("Quitar del grupo actual") }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { if (newGroupName.isNotBlank()) onAssign(newGroupName) }) { Text("Crear y asignar") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } }
+    )
+}
+
+@Composable
+private fun OrganizeFoldersDialog(
+    folders: List<SystemFolder>,
+    existingGroups: List<String>,
+    onAssign: (String, String?) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var editingFolder by remember { mutableStateOf<SystemFolder?>(null) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Organizar carpetas") },
+        text = {
+            Column(Modifier.heightIn(max = 400.dp).verticalScroll(rememberScrollState())) {
+                folders.forEach { folder ->
+                    TextButton(onClick = { editingFolder = folder }, modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(folder.name, maxLines = 1)
+                            Text(
+                                folder.groupName ?: "Sin grupo",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Listo") } }
+    )
+
+    editingFolder?.let { folder ->
+        FolderGroupDialog(
+            folder = folder,
+            existingGroups = existingGroups,
+            onAssign = { group -> onAssign(folder.bucketId, group); editingFolder = null },
+            onDismiss = { editingFolder = null }
+        )
     }
 }
 
@@ -224,6 +399,8 @@ fun AlbumDetailScreen(vm: GalleryViewModel, albumId: Long, onBack: () -> Unit, o
         if (sender != null) trashLauncher.launch(IntentSenderRequest.Builder(sender).build())
         else vm.confirmTrash(ids)
     }
+
+    LaunchedEffect(albumPhotos) { vm.setDetailContext(albumPhotos.map { it.id }) }
 
     Scaffold(
         topBar = {
@@ -321,6 +498,8 @@ fun SystemFolderScreen(vm: GalleryViewModel, bucketId: String, onBack: () -> Uni
         if (sender != null) trashLauncher.launch(IntentSenderRequest.Builder(sender).build())
         else vm.confirmTrash(ids)
     }
+
+    LaunchedEffect(folderPhotos) { vm.setDetailContext(folderPhotos.map { it.id }) }
 
     Scaffold(
         topBar = {

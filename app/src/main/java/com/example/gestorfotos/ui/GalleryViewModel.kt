@@ -36,20 +36,38 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
         photos.map { list -> list.filter { it.isFavorite && !it.isTrashed } }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    /** Carpetas reales del teléfono (Cámara, WhatsApp Images, etc.), de solo lectura. */
-    val systemFolders: StateFlow<List<SystemFolder>> = photos.map { list ->
+    /** Carpetas reales del teléfono (Cámara, WhatsApp Images, etc.). Grupo y favorito
+     *  son propios de la app; el resto viene del sistema y es de solo lectura. */
+    val systemFolders: StateFlow<List<SystemFolder>> = combine(photos, repo.folderMeta) { list, metas ->
+        val metaByBucket = metas.associateBy { it.bucketId }
         list.filter { !it.isTrashed }
             .groupBy { it.bucketId to it.bucketName }
             .map { (key, items) ->
+                val meta = metaByBucket[key.first]
                 SystemFolder(
                     bucketId = key.first,
                     name = key.second,
                     photoCount = items.size,
-                    coverUri = items.maxByOrNull { it.dateAddedMillis }!!.displayUri
+                    coverUri = items.maxByOrNull { it.dateAddedMillis }!!.displayUri,
+                    groupName = meta?.groupName,
+                    isFavorite = meta?.isFavorite ?: false
                 )
             }
             .sortedByDescending { it.photoCount }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /** Nombres de grupo ya creados (para ofrecerlos al asignar una carpeta a uno existente). */
+    val folderGroupNames: StateFlow<List<String>> = systemFolders.map { list ->
+        list.mapNotNull { it.groupName }.distinct().sorted()
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun setFolderGroup(bucketId: String, groupName: String?) {
+        viewModelScope.launch { repo.setFolderGroup(bucketId, groupName) }
+    }
+
+    fun toggleFolderFavorite(bucketId: String, current: Boolean) {
+        viewModelScope.launch { repo.setFolderFavorite(bucketId, !current) }
+    }
 
     fun photosInFolder(bucketId: String): List<UiPhoto> =
         photos.value.filter { it.bucketId == bucketId && !it.isTrashed }
@@ -65,6 +83,16 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
 
     private val _recentIds = MutableStateFlow<List<Long>>(emptyList())
     val recentIds: StateFlow<List<Long>> = _recentIds
+
+    // Lista ordenada de ids que está mostrando la pantalla actual (Fotos, un álbum,
+    // una carpeta, Favoritos o Búsqueda). La usa PhotoDetailScreen para poder deslizar
+    // a la foto siguiente/anterior sin salir y volver a entrar.
+    private val _detailContext = MutableStateFlow<List<Long>>(emptyList())
+    val detailContext: StateFlow<List<Long>> = _detailContext
+
+    fun setDetailContext(ids: List<Long>) {
+        if (_detailContext.value != ids) _detailContext.value = ids
+    }
 
     private val _duplicateGroups = MutableStateFlow<List<List<Long>>>(emptyList())
     val duplicateGroups: StateFlow<List<List<Long>>> = _duplicateGroups
