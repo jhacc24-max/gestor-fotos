@@ -8,6 +8,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.horizontalScroll
@@ -47,7 +48,7 @@ private val TAG_VOCAB = listOf(
     "paisaje", "retrato", "ciudad", "noche", "amigos"
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun PhotoDetailScreen(vm: GalleryViewModel, photoId: Long, onClose: () -> Unit) {
     // Lista de fotos por la que se puede deslizar (la que estaba viendo la pantalla
