@@ -118,6 +118,7 @@ class PhotoRepository(private val context: Context) {
             MediaStore.Images.Media._ID,
             MediaStore.Images.Media.DISPLAY_NAME,
             MediaStore.Images.Media.DATE_ADDED,
+            MediaStore.Images.Media.DATE_TAKEN,
             MediaStore.Images.Media.BUCKET_ID,
             MediaStore.Images.Media.BUCKET_DISPLAY_NAME
         )
@@ -128,21 +129,29 @@ class PhotoRepository(private val context: Context) {
 
         context.contentResolver.query(
             collection, projection, null, null,
-            "${MediaStore.Images.Media.DATE_ADDED} DESC"
+            "CASE WHEN ${MediaStore.Images.Media.DATE_TAKEN} > 0 THEN ${MediaStore.Images.Media.DATE_TAKEN} ELSE ${MediaStore.Images.Media.DATE_ADDED} * 1000 END DESC"
         )?.use { cursor ->
             val idCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
             val nameCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
-            val dateCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)
+            val dateAddedCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)
+            val dateTakenCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_TAKEN)
             val bucketIdCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.BUCKET_ID)
             val bucketNameCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.BUCKET_DISPLAY_NAME)
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idCol)
                 val uri = ContentUris.withAppendedId(collection, id)
+                // DATE_TAKEN (del EXIF) es la fecha real en que se tomó la foto; DATE_ADDED
+                // es solo cuándo el archivo entró al MediaStore, que para fotos recibidas por
+                // WhatsApp, Telegram, transferencias, etc. puede ser un día totalmente distinto.
+                // Se usa DATE_TAKEN cuando existe (no es nulo ni 0) y si no, se cae a DATE_ADDED.
+                val dateTaken = cursor.getLong(dateTakenCol)
+                val dateAddedMillis = cursor.getLong(dateAddedCol) * 1000L
+                val bestDate = if (dateTaken > 0L) dateTaken else dateAddedMillis
                 pending += MediaImage(
                     id = id,
                     uri = uri,
                     displayName = cursor.getString(nameCol) ?: "",
-                    dateAddedMillis = cursor.getLong(dateCol) * 1000L,
+                    dateAddedMillis = bestDate,
                     bucketId = cursor.getString(bucketIdCol) ?: "sin_carpeta",
                     bucketName = cursor.getString(bucketNameCol) ?: "Sin carpeta"
                 )
