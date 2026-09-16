@@ -89,6 +89,7 @@ fun PhotosScreen(
     val requestShare = rememberShareRequester(vm)
 
     val sdf = remember { SimpleDateFormat("d MMM", Locale("es", "ES")) }
+    val sdfConAnio = remember { SimpleDateFormat("d MMM yyyy", Locale("es", "ES")) }
     val grouped = remember(photos) {
         photos.groupBy { p ->
             val cal = Calendar.getInstance().apply { timeInMillis = p.dateAddedMillis }
@@ -99,6 +100,11 @@ fun PhotosScreen(
                         cal.get(Calendar.YEAR) == today.get(Calendar.YEAR) -> "Hoy"
                 cal.get(Calendar.DAY_OF_YEAR) == yesterday.get(Calendar.DAY_OF_YEAR) &&
                         cal.get(Calendar.YEAR) == yesterday.get(Calendar.YEAR) -> "Ayer"
+                // Si es de un año distinto al actual, se muestra el año en el rótulo
+                // ("12 sept 2025"); si no, se omite ("12 sept") como hasta ahora.
+                // Antes se omitía siempre, y una foto de hace un año con el mismo día
+                // se veía idéntica a una de este año, generando confusión.
+                cal.get(Calendar.YEAR) != today.get(Calendar.YEAR) -> sdfConAnio.format(Date(p.dateAddedMillis))
                 else -> sdf.format(Date(p.dateAddedMillis))
             }
         }

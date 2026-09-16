@@ -9,6 +9,10 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.horizontalScroll
@@ -28,6 +32,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -168,10 +173,30 @@ private fun PhotoDetailPage(vm: GalleryViewModel, photoId: Long, onClose: () -> 
                                 )
                             }
                             launch {
-                                detectTransformGestures { _, pan, zoom, _ ->
-                                    val newScale = (scale * zoom).coerceIn(1f, 6f)
-                                    scale = newScale
-                                    offset = if (newScale <= 1f) Offset.Zero else offset + pan
+                                // Solo se toma el gesto de arrastre para zoom/paneo cuando
+                                // realmente hay 2 dedos (pellizco) o ya se está con zoom
+                                // activo (para poder mover la imagen ampliada). Con 1 dedo
+                                // y sin zoom, NO se consume nada, para que el arrastre le
+                                // llegue intacto al carrusel de fotos (HorizontalPager) y
+                                // se pueda deslizar a la foto siguiente/anterior. Antes esto
+                                // se manejaba con detectTransformGestures, que capturaba
+                                // cualquier arrastre de 1 dedo también, bloqueando el swipe.
+                                awaitEachGesture {
+                                    awaitFirstDown(requireUnconsumed = false)
+                                    do {
+                                        val event = awaitPointerEvent()
+                                        val pointerCount = event.changes.size
+                                        if (pointerCount >= 2 || scale > 1f) {
+                                            val zoomChange = event.calculateZoom()
+                                            val panChange = event.calculatePan()
+                                            val newScale = (scale * zoomChange).coerceIn(1f, 6f)
+                                            scale = newScale
+                                            offset = if (newScale <= 1f) Offset.Zero else offset + panChange
+                                            event.changes.forEach { change ->
+                                                if (change.positionChanged()) change.consume()
+                                            }
+                                        }
+                                    } while (event.changes.any { it.pressed })
                                 }
                             }
                         }

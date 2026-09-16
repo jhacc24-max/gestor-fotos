@@ -483,7 +483,7 @@ fun SystemFolderScreen(vm: GalleryViewModel, bucketId: String, onBack: () -> Uni
     val photos by vm.photos.collectAsState()
     val albums by vm.albums.collectAsState()
     val folder = folders.find { it.bucketId == bucketId }
-    val folderPhotos = photos.filter { it.bucketId == bucketId && !it.isTrashed }
+    val folderPhotos = photos.filter { it.bucketId == bucketId && !it.isTrashed && it.albumId == null }
     val selectMode by vm.selectMode.collectAsState()
     val selected by vm.selected.collectAsState()
 

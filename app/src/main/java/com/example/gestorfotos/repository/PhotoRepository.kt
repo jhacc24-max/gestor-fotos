@@ -129,7 +129,9 @@ class PhotoRepository(private val context: Context) {
 
         context.contentResolver.query(
             collection, projection, null, null,
-            "CASE WHEN ${MediaStore.Images.Media.DATE_TAKEN} > 0 THEN ${MediaStore.Images.Media.DATE_TAKEN} ELSE ${MediaStore.Images.Media.DATE_ADDED} * 1000 END DESC"
+            "CASE WHEN ${MediaStore.Images.Media.DATE_TAKEN} > 946684800000 AND " +
+                "${MediaStore.Images.Media.DATE_TAKEN} <= ${MediaStore.Images.Media.DATE_ADDED} * 1000 + 86400000 " +
+                "THEN ${MediaStore.Images.Media.DATE_TAKEN} ELSE ${MediaStore.Images.Media.DATE_ADDED} * 1000 END DESC"
         )?.use { cursor ->
             val idCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
             val nameCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
@@ -140,13 +142,19 @@ class PhotoRepository(private val context: Context) {
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idCol)
                 val uri = ContentUris.withAppendedId(collection, id)
-                // DATE_TAKEN (del EXIF) es la fecha real en que se tomó la foto; DATE_ADDED
-                // es solo cuándo el archivo entró al MediaStore, que para fotos recibidas por
-                // WhatsApp, Telegram, transferencias, etc. puede ser un día totalmente distinto.
-                // Se usa DATE_TAKEN cuando existe (no es nulo ni 0) y si no, se cae a DATE_ADDED.
+                // DATE_TAKEN (EXIF) a veces viene mal: en 0, heredada de un archivo
+                // que circuló por internet/WhatsApp con una fecha absurdamente antigua,
+                // o incluso posterior a cuándo el archivo entró al teléfono (imposible si
+                // fuera real). Por eso solo se usa si es creíble: posterior al año 2000 y
+                // no posterior a DATE_ADDED (con 1 día de margen por desfaces de reloj).
+                // Si no pasa ese filtro, se usa DATE_ADDED, que siempre es consistente
+                // aunque no sea la fecha exacta de la toma.
                 val dateTaken = cursor.getLong(dateTakenCol)
                 val dateAddedMillis = cursor.getLong(dateAddedCol) * 1000L
-                val bestDate = if (dateTaken > 0L) dateTaken else dateAddedMillis
+                val year2000 = 946684800000L
+                val oneDayMs = 24 * 60 * 60 * 1000L
+                val dateTakenIsPlausible = dateTaken > year2000 && dateTaken <= dateAddedMillis + oneDayMs
+                val bestDate = if (dateTakenIsPlausible) dateTaken else dateAddedMillis
                 pending += MediaImage(
                     id = id,
                     uri = uri,

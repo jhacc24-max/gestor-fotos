@@ -36,11 +36,13 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
         photos.map { list -> list.filter { it.isFavorite && !it.isTrashed } }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    /** Carpetas reales del teléfono (Cámara, WhatsApp Images, etc.). Grupo y favorito
-     *  son propios de la app; el resto viene del sistema y es de solo lectura. */
+    /** Carpetas reales del teléfono (Cámara, WhatsApp Images, etc.). Solo muestra fotos
+     *  que TODAVÍA no se movieron a ningún álbum propio: en cuanto mueves una a un álbum,
+     *  desaparece de aquí (ya quedó organizada, no hace falta verla en dos sitios).
+     *  Grupo y favorito de la carpeta sí son propios de la app; el resto es de solo lectura. */
     val systemFolders: StateFlow<List<SystemFolder>> = combine(photos, repo.folderMeta) { list, metas ->
         val metaByBucket = metas.associateBy { it.bucketId }
-        list.filter { !it.isTrashed }
+        list.filter { !it.isTrashed && it.albumId == null }
             .groupBy { it.bucketId to it.bucketName }
             .map { (key, items) ->
                 val meta = metaByBucket[key.first]
@@ -70,7 +72,7 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun photosInFolder(bucketId: String): List<UiPhoto> =
-        photos.value.filter { it.bucketId == bucketId && !it.isTrashed }
+        photos.value.filter { it.bucketId == bucketId && !it.isTrashed && it.albumId == null }
 
     private val _selectMode = MutableStateFlow(false)
     val selectMode: StateFlow<Boolean> = _selectMode
