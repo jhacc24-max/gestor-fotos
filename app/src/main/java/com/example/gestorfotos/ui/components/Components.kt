@@ -29,10 +29,66 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import coil.size.Size
 import com.example.gestorfotos.repository.UiPhoto
 import com.example.gestorfotos.ui.theme.Amber
 import com.example.gestorfotos.ui.theme.Teal
+
+fun formatDuration(ms: Long): String {
+    val total = ms / 1000
+    val h = total / 3600
+    val m = (total % 3600) / 60
+    val sec = total % 60
+    return if (h > 0) "%d:%02d:%02d".format(h, m, sec) else "%d:%02d".format(m, sec)
+}
+
+/**
+ * Galería agrupada por día en UNA sola cuadrícula perezosa (encabezados que ocupan toda la fila).
+ * Antes había una LazyVerticalGrid por cada día dentro de una Column: cada una medía y componía
+ * todas sus fotos de golpe, y esa era la mayor causa de lentitud.
+ */
+@Composable
+fun GroupedPhotoGrid(
+    groups: List<Pair<String, List<UiPhoto>>>,
+    selectMode: Boolean,
+    selected: Set<Long>,
+    onTap: (UiPhoto) -> Unit,
+    onLongPress: (UiPhoto) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(3),
+        contentPadding = PaddingValues(2.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = modifier
+    ) {
+        groups.forEach { (label, dayPhotos) ->
+            item(key = "h_$label", span = { GridItemSpan(maxLineSpan) }, contentType = "header") {
+                Text(
+                    label,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(top = 10.dp, bottom = 2.dp)
+                )
+            }
+            items(dayPhotos, key = { it.id }, contentType = { "photo" }) { photo ->
+                PhotoCard(
+                    photo = photo,
+                    selectMode = selectMode,
+                    isSelected = photo.id in selected,
+                    onTap = { onTap(photo) },
+                    onLongPress = { onLongPress(photo) }
+                )
+            }
+        }
+    }
+}
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -56,7 +112,7 @@ fun PhotoGrid(
         verticalArrangement = Arrangement.spacedBy(6.dp),
         modifier = modifier
     ) {
-        items(photos, key = { it.id }) { photo ->
+        items(photos, key = { it.id }, contentType = { "photo" }) { photo ->
             PhotoCard(
                 photo = photo,
                 selectMode = selectMode,
@@ -88,14 +144,47 @@ fun PhotoCard(
             .border(2.dp, borderColor, RoundedCornerShape(10.dp))
             .combinedClickable(onClick = onTap, onLongClick = onLongPress)
     ) {
+        val context = LocalContext.current
+        // Miniatura de 256px: sin esto cada celda podía decodificar la foto completa.
+        val request = remember(photo.displayUri) {
+            ImageRequest.Builder(context)
+                .data(photo.displayUri)
+                .size(Size(256, 256))
+                .memoryCacheKey("t_${photo.id}_${photo.displayUri}")
+                .build()
+        }
         AsyncImage(
-            model = photo.displayUri,
+            model = request,
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier
                 .fillMaxSize()
                 .rotate(photo.rotationDegrees.toFloat())
         )
+
+        if (photo.isVideo) {
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(4.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color.Black.copy(alpha = 0.55f))
+                    .padding(horizontal = 4.dp, vertical = 1.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                androidx.compose.material3.Icon(
+                    Icons.Filled.PlayArrow, null, tint = Color.White,
+                    modifier = Modifier.size(14.dp)
+                )
+                Text(
+                    formatDuration(photo.durationMs),
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Clip
+                )
+            }
+        }
 
         AnimatedVisibility(
             visible = selectMode,

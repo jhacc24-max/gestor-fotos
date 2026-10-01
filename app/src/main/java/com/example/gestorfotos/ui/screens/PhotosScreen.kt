@@ -14,12 +14,40 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.gestorfotos.ui.GalleryViewModel
+import com.example.gestorfotos.ui.components.GroupedPhotoGrid
 import com.example.gestorfotos.ui.components.PhotoGrid
 import com.example.gestorfotos.ui.components.SelectionBar
 import com.example.gestorfotos.ui.components.SkeuoIconButton
 import com.example.gestorfotos.ui.components.SkeuoStyle
-import java.text.SimpleDateFormat
-import java.util.*
+import com.example.gestorfotos.repository.UiPhoto
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+
+/** Agrupa por día ("Hoy", "Ayer", "3 oct") con un solo cálculo de zona horaria. */
+private fun groupByDay(photos: List<UiPhoto>): List<Pair<String, List<UiPhoto>>> {
+    val zone = ZoneId.systemDefault()
+    val today = LocalDate.now(zone)
+    val fmt = DateTimeFormatter.ofPattern("d MMM", Locale("es", "ES"))
+    val out = ArrayList<Pair<String, MutableList<UiPhoto>>>()
+    var lastDay: LocalDate? = null
+    for (p in photos) { // ya vienen ordenadas por fecha desc
+        val day = Instant.ofEpochMilli(p.dateAddedMillis).atZone(zone).toLocalDate()
+        if (day != lastDay) {
+            val label = when (day) {
+                today -> "Hoy"
+                today.minusDays(1) -> "Ayer"
+                else -> day.format(fmt)
+            }
+            out += label to mutableListOf()
+            lastDay = day
+        }
+        out.last().second += p
+    }
+    return out
+}
 
 /** Lanza la papelera real del sistema (API 30+) pidiendo confirmación al usuario;
  *  en versiones anteriores marca la papelera directamente en Room. */
@@ -53,21 +81,7 @@ fun PhotosScreen(
     val albums by vm.albums.collectAsState()
     val requestTrash = rememberTrashRequester(vm)
 
-    val sdf = remember { SimpleDateFormat("d MMM", Locale("es", "ES")) }
-    val grouped = remember(photos) {
-        photos.groupBy { p ->
-            val cal = Calendar.getInstance().apply { timeInMillis = p.dateAddedMillis }
-            val today = Calendar.getInstance()
-            val yesterday = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }
-            when {
-                cal.get(Calendar.DAY_OF_YEAR) == today.get(Calendar.DAY_OF_YEAR) &&
-                        cal.get(Calendar.YEAR) == today.get(Calendar.YEAR) -> "Hoy"
-                cal.get(Calendar.DAY_OF_YEAR) == yesterday.get(Calendar.DAY_OF_YEAR) &&
-                        cal.get(Calendar.YEAR) == yesterday.get(Calendar.YEAR) -> "Ayer"
-                else -> sdf.format(Date(p.dateAddedMillis))
-            }
-        }
-    }
+    val grouped = remember(photos) { groupByDay(photos) }
 
     Scaffold(
         topBar = {
@@ -96,29 +110,21 @@ fun PhotosScreen(
             )
         }
     ) { padding ->
-        Column(Modifier.padding(padding).padding(horizontal = 12.dp)) {
+        Box(Modifier.padding(padding).padding(horizontal = 12.dp)) {
             if (grouped.isEmpty()) {
                 PhotoGrid(
                     photos = emptyList(), selectMode = selectMode, selected = selected,
-                    emptyMessage = "Todo clasificado. No quedan fotos sin álbum.",
+                    emptyMessage = "Todo clasificado. No quedan fotos ni videos sin álbum.",
                     onTap = {}, onLongPress = {}
                 )
             } else {
-                grouped.forEach { (label, items) ->
-                    Text(
-                        label,
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(vertical = 8.dp)
-                    )
-                    PhotoGrid(
-                        photos = items,
-                        selectMode = selectMode,
-                        selected = selected,
-                        emptyMessage = "",
-                        onTap = { if (selectMode) vm.toggleSelect(it.id) else onOpenDetail(it.id) },
-                        onLongPress = { vm.enterSelectMode(); vm.toggleSelect(it.id) }
-                    )
-                }
+                GroupedPhotoGrid(
+                    groups = grouped,
+                    selectMode = selectMode,
+                    selected = selected,
+                    onTap = { if (selectMode) vm.toggleSelect(it.id) else onOpenDetail(it.id) },
+                    onLongPress = { vm.enterSelectMode(); vm.toggleSelect(it.id) }
+                )
             }
         }
     }

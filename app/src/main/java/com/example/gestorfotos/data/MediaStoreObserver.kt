@@ -50,6 +50,11 @@ class MediaStoreObserver(
             true,
             this
         )
+        context.contentResolver.registerContentObserver(
+            MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+            true,
+            this
+        )
     }
 
     fun unregister() {

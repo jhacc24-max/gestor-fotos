@@ -32,6 +32,9 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
+            // Firmado con la clave de debug para poder instalarlo directamente; release no es
+            // "debuggable", lo que hace a Compose bastante más rápido que un APK debug.
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 }
@@ -62,6 +65,7 @@ dependencies {
 
     // Carga de imágenes
     implementation("io.coil-kt:coil-compose:2.6.0")
+    implementation("io.coil-kt:coil-video:2.6.0") // miniaturas de video
 
     // OCR on-device
     implementation("com.google.mlkit:text-recognition:16.0.1")

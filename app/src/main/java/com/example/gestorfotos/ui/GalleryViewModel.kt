@@ -55,9 +55,7 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
 
     private var undoToken = 0
 
-    init {
-        viewModelScope.launch { repo.refreshMediaStore() }
-    }
+    // El MediaStore se lee desde MainActivity, una vez concedido el permiso.
 
     fun refreshCleanupSuggestions() {
         viewModelScope.launch { _duplicateGroups.value = repo.findDuplicateGroups() }
@@ -72,7 +70,7 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
 
     fun openDetail(id: Long) {
         _recentIds.value = (listOf(id) + _recentIds.value.filter { it != id }).take(8)
-        viewModelScope.launch { repo.markViewed(id) }
+        // Sin escritura en la base de datos: antes cada apertura recalculaba toda la galería.
     }
 
     private fun postUndo(message: String, undoFn: suspend () -> Unit) {

@@ -18,8 +18,18 @@ data class MediaImage(
     val id: Long,
     val uri: Uri,
     val displayName: String,
-    val dateAddedMillis: Long
+    val dateAddedMillis: Long,
+    val isVideo: Boolean = false,
+    val durationMs: Long = 0L
 )
+
+/**
+ * Las fotos y los videos viven en tablas distintas del MediaStore y sus ids pueden coincidir.
+ * Para tener una clave única, los videos se guardan con el id en negativo (-id).
+ */
+fun mediaUriFor(id: Long): Uri =
+    if (id < 0) ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, -id)
+    else ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
 
 /** Modelo unificado que usa la UI: fusiona la foto real (MediaStore) con sus metadatos (Room). */
 data class UiPhoto(
@@ -36,7 +46,9 @@ data class UiPhoto(
     val tags: List<String>,
     val ocrText: String,
     val perceptualHash: String?,
-    val blurScore: Double?
+    val blurScore: Double?,
+    val isVideo: Boolean = false,
+    val durationMs: Long = 0L
 ) {
     val displayUri: Uri get() = croppedUri?.let(Uri::parse) ?: uri
 }
@@ -51,7 +63,10 @@ class PhotoRepository(private val context: Context) {
 
     val albums = albumDao.observeAlbums()
 
-    val photos: Flow<List<UiPhoto>> = combine(_mediaImages, metaDao.observeAll()) { media, metas ->
+    // debounce: mientras el indexador guarda foto por foto, se agrupan los cambios en lugar de
+    // reconstruir toda la lista en cada guardado.
+    @OptIn(FlowPreview::class)
+    val photos: Flow<List<UiPhoto>> = combine(_mediaImages, metaDao.observeAll().debounce(120)) { media, metas ->
         val metaById = metas.associateBy { it.mediaStoreId }
         media.map { m ->
             val meta = metaById[m.id]
@@ -66,17 +81,43 @@ class PhotoRepository(private val context: Context) {
                 trashedAt = meta?.trashedAt,
                 rotationDegrees = meta?.rotationDegrees ?: 0,
                 croppedUri = meta?.croppedUri,
-                tags = meta?.manualTags?.split(",")?.filter { it.isNotBlank() } ?: emptyList(),
+                tags = meta?.manualTags?.takeIf { it.isNotEmpty() }
+                    ?.split(",")?.filter { it.isNotBlank() } ?: emptyList(),
                 ocrText = meta?.ocrText ?: "",
                 perceptualHash = meta?.perceptualHash,
-                blurScore = meta?.blurScore
+                blurScore = meta?.blurScore,
+                isVideo = m.isVideo,
+                durationMs = m.durationMs
             )
+        }
+    }.flowOn(Dispatchers.Default) // el fusionado de miles de fotos no debe correr en el hilo de UI
+
+    /** Lee fotos y videos del MediaStore. Llamar al iniciar y tras cambios de permisos. */
+    suspend fun refreshMediaStore() = withContext(Dispatchers.IO) {
+        val list = ArrayList<MediaImage>(2048)
+        try {
+            queryImages(list)
+        } catch (_: SecurityException) {
+            // sin permiso de fotos todavía
+        }
+        try {
+            queryVideos(list)
+        } catch (_: SecurityException) {
+            // sin permiso de videos todavía
+        }
+        list.sortByDescending { it.dateAddedMillis }
+        _mediaImages.value = list
+        // Crea una fila por defecto para lo nuevo. Los videos nacen "ya analizados"
+        // porque OCR / hash / borrosidad solo aplican a imágenes.
+        val now = System.currentTimeMillis()
+        list.chunked(500).forEach { chunk ->
+            metaDao.insertDefaults(chunk.map {
+                PhotoMeta(mediaStoreId = it.id, analyzedAt = if (it.isVideo) now else null)
+            })
         }
     }
 
-    /** Lee el MediaStore real del dispositivo. Llamar al iniciar y tras cambios de permisos. */
-    suspend fun refreshMediaStore() = withContext(Dispatchers.IO) {
-        val list = mutableListOf<MediaImage>()
+    private fun queryImages(out: MutableList<MediaImage>) {
         val collection = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
         val projection = arrayOf(
             MediaStore.Images.Media._ID,
@@ -92,18 +133,44 @@ class PhotoRepository(private val context: Context) {
             val dateCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idCol)
-                val uri = ContentUris.withAppendedId(collection, id)
-                list += MediaImage(
+                out += MediaImage(
                     id = id,
-                    uri = uri,
+                    uri = ContentUris.withAppendedId(collection, id),
                     displayName = cursor.getString(nameCol) ?: "",
                     dateAddedMillis = cursor.getLong(dateCol) * 1000L
                 )
             }
         }
-        _mediaImages.value = list
-        // Crea una fila de metadatos por defecto para fotos nuevas que la app aún no conoce.
-        metaDao.insertDefaults(list.map { PhotoMeta(mediaStoreId = it.id) })
+    }
+
+    private fun queryVideos(out: MutableList<MediaImage>) {
+        val collection = MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+        val projection = arrayOf(
+            MediaStore.Video.Media._ID,
+            MediaStore.Video.Media.DISPLAY_NAME,
+            MediaStore.Video.Media.DATE_ADDED,
+            MediaStore.Video.Media.DURATION
+        )
+        context.contentResolver.query(
+            collection, projection, null, null,
+            "${MediaStore.Video.Media.DATE_ADDED} DESC"
+        )?.use { cursor ->
+            val idCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
+            val nameCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DISPLAY_NAME)
+            val dateCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATE_ADDED)
+            val durCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DURATION)
+            while (cursor.moveToNext()) {
+                val id = cursor.getLong(idCol)
+                out += MediaImage(
+                    id = -id,
+                    uri = ContentUris.withAppendedId(collection, id),
+                    displayName = cursor.getString(nameCol) ?: "",
+                    dateAddedMillis = cursor.getLong(dateCol) * 1000L,
+                    isVideo = true,
+                    durationMs = cursor.getLong(durCol)
+                )
+            }
+        }
     }
 
     // ---- álbumes ----
@@ -188,7 +255,7 @@ class PhotoRepository(private val context: Context) {
      * scoped storage, así que con WRITE_EXTERNAL_STORAGE concedido el borrado es directo.
      */
     suspend fun attemptPermanentDelete(mediaStoreId: Long): DeleteOutcome = withContext(Dispatchers.IO) {
-        val uri = ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, mediaStoreId)
+        val uri = mediaUriFor(mediaStoreId)
         try {
             val rows = context.contentResolver.delete(uri, null, null)
             if (rows > 0) {
@@ -207,7 +274,7 @@ class PhotoRepository(private val context: Context) {
 
     /** Tras obtener el consentimiento del IntentSender de arriba, reintentar el borrado. */
     suspend fun confirmPermanentDelete(mediaStoreId: Long) = withContext(Dispatchers.IO) {
-        val uri = ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, mediaStoreId)
+        val uri = mediaUriFor(mediaStoreId)
         try {
             context.contentResolver.delete(uri, null, null)
         } catch (_: SecurityException) {

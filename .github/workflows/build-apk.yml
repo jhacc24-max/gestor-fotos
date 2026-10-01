@@ -2,8 +2,11 @@ name: Build APK
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, 'claude/**' ]
   workflow_dispatch: {}
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -23,11 +26,25 @@ jobs:
         with:
           gradle-version: 8.6
 
-      - name: Build debug APK
-        run: gradle assembleDebug --no-daemon --stacktrace
+      # Release (no debuggable) firmado con la clave de debug: instala directo y va mucho más fluido.
+      - name: Build release APK
+        run: gradle assembleRelease --no-daemon --stacktrace
+
+      - name: Rename APK
+        run: cp app/build/outputs/apk/release/*.apk gestor-fotos.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: gestor-fotos-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          name: gestor-fotos-apk
+          path: gestor-fotos.apk
+
+      # Publica el APK en Releases para descargarlo directo desde el celular.
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-latest
+          name: Gestor de Fotos (última versión)
+          prerelease: true
+          target_commitish: ${{ github.sha }}
+          files: gestor-fotos.apk

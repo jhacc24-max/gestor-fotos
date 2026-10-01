@@ -31,14 +31,37 @@ class IndexingWorker(appContext: Context, params: WorkerParameters) : CoroutineW
         val dao = AppDatabase.getInstance(applicationContext).photoMetaDao()
         val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
 
-        val pending = dao.getUnanalyzed(limit = 25)
-        for (meta in pending) {
+        // Procesa en lotes hasta vaciar la cola (antes solo 25 fotos cada 6 horas).
+        var guard = 0
+        while (guard++ < 400) {
+            val pending = dao.getUnanalyzed(limit = 25)
+            if (pending.isEmpty()) break
+            for (meta in pending) processOne(dao, recognizer, meta)
+        }
+        recognizer.close()
+        Result.success()
+    }
+
+    private suspend fun processOne(
+        dao: com.example.gestorfotos.data.PhotoMetaDao,
+        recognizer: com.google.mlkit.vision.text.TextRecognizer,
+        meta: com.example.gestorfotos.data.PhotoMeta
+    ) {
+        run {
             try {
+                if (meta.mediaStoreId < 0) { // video: nada que analizar
+                    dao.upsert(meta.copy(analyzedAt = System.currentTimeMillis()))
+                    return
+                }
                 val uri = ContentUris.withAppendedId(
                     MediaStore.Images.Media.EXTERNAL_CONTENT_URI, meta.mediaStoreId
                 )
 
-                val bitmap = loadDownsampledBitmap(applicationContext, uri, 512) ?: continue
+                val bitmap = loadDownsampledBitmap(applicationContext, uri, 512) ?: run {
+                    // no se pudo leer: se marca para no reintentar eternamente
+                    dao.upsert(meta.copy(analyzedAt = System.currentTimeMillis()))
+                    return
+                }
 
                 val ocrText = try {
                     val image = InputImage.fromBitmap(bitmap, 0)
@@ -60,12 +83,10 @@ class IndexingWorker(appContext: Context, params: WorkerParameters) : CoroutineW
                 )
                 bitmap.recycle()
             } catch (_: Exception) {
-                // Se ignora esta foto y se continúa; quedará pendiente para el próximo ciclo
-                // si analyzedAt sigue en null (aquí se podría además marcar un contador de reintentos).
+                // Se marca como analizada para que una foto corrupta no bloquee la cola.
+                dao.upsert(meta.copy(analyzedAt = System.currentTimeMillis()))
             }
         }
-
-        if (pending.size == 25) Result.success() else Result.success()
     }
 
     private fun loadDownsampledBitmap(context: Context, uri: android.net.Uri, targetSize: Int): Bitmap? {
@@ -120,13 +141,19 @@ class IndexingWorker(appContext: Context, params: WorkerParameters) : CoroutineW
     }
 
     /** DCT-II de 1 dimensión con normalización estándar. */
+    private val cosTable: Array<DoubleArray> by lazy {
+        val n = 32
+        Array(n) { u -> DoubleArray(n) { x -> Math.cos(Math.PI / n * (x + 0.5) * u) } }
+    }
+
     private fun dct1D(vector: DoubleArray): DoubleArray {
         val n = vector.size
         val result = DoubleArray(n)
         for (u in 0 until n) {
             var sum = 0.0
+            val row = cosTable[u]
             for (x in 0 until n) {
-                sum += vector[x] * Math.cos(Math.PI / n * (x + 0.5) * u)
+                sum += vector[x] * row[x]
             }
             val cu = if (u == 0) 1.0 / Math.sqrt(2.0) else 1.0
             result[u] = sum * cu * Math.sqrt(2.0 / n)
@@ -145,16 +172,21 @@ class IndexingWorker(appContext: Context, params: WorkerParameters) : CoroutineW
             (android.graphics.Color.red(p) + android.graphics.Color.green(p) + android.graphics.Color.blue(p)) / 3.0
         } }
 
-        val laplacian = mutableListOf<Double>()
+        // Media y varianza en una sola pasada, sin listas de Double (evita boxing).
+        var count = 0
+        var sum = 0.0
+        var sumSq = 0.0
         for (y in 1 until h - 1) {
             for (x in 1 until w - 1) {
                 val value = -4 * gray[y][x] + gray[y - 1][x] + gray[y + 1][x] + gray[y][x - 1] + gray[y][x + 1]
-                laplacian += value
+                sum += value
+                sumSq += value * value
+                count++
             }
         }
         small.recycle()
-        if (laplacian.isEmpty()) return 0.0
-        val mean = laplacian.average()
-        return laplacian.sumOf { (it - mean).pow(2) } / laplacian.size
+        if (count == 0) return 0.0
+        val mean = sum / count
+        return sumSq / count - mean * mean
     }
 }

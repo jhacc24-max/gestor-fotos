@@ -18,7 +18,7 @@ import com.example.gestorfotos.ui.navigation.GestorFotosNavHost
 import com.example.gestorfotos.ui.theme.GestorFotosTheme
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
-import com.google.accompanist.permissions.rememberPermissionState
+import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -37,22 +37,24 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             GestorFotosTheme {
-                val permission = if (Build.VERSION.SDK_INT >= 33) {
-                    Manifest.permission.READ_MEDIA_IMAGES
+                val permissions = if (Build.VERSION.SDK_INT >= 33) {
+                    listOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO)
                 } else {
-                    Manifest.permission.READ_EXTERNAL_STORAGE
+                    listOf(Manifest.permission.READ_EXTERNAL_STORAGE)
                 }
-                val permissionState = rememberPermissionState(permission)
+                val permissionState = rememberMultiplePermissionsState(permissions)
+                // Basta con tener fotos O videos para entrar.
+                val granted = permissionState.permissions.any { it.status.isGranted }
                 val scope = rememberCoroutineScope()
 
                 Surface(color = MaterialTheme.colorScheme.background) {
-                    if (permissionState.status.isGranted) {
+                    if (granted) {
                         LaunchedEffect(Unit) {
                             scope.launch { viewModel.repo.refreshMediaStore() }
                         }
                         GestorFotosNavHost(viewModel = viewModel, activity = this)
                     } else {
-                        PermissionRequest(onRequest = { permissionState.launchPermissionRequest() })
+                        PermissionRequest(onRequest = { permissionState.launchMultiplePermissionRequest() })
                     }
                 }
             }
@@ -73,12 +75,12 @@ private fun PermissionRequest(onRequest: () -> Unit) {
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            "Necesitamos acceso a tus fotos",
+            "Necesitamos acceso a tus fotos y videos",
             style = MaterialTheme.typography.headlineSmall
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            "Para mostrar, organizar y editar las imágenes de tu galería.",
+            "Para mostrar, organizar y editar las fotos y videos de tu galería.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
